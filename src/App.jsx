@@ -17,20 +17,23 @@ const EditIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" w
 const XIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
 const SparklesIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8-5.8 1.9 5.8 1.9L12 18l1.9-5.8 5.8-1.9-5.8-1.9L12 3z" /><path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" /></svg>;
 const PackageIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v2"/><path d="M21 14v2a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16v-2"/><path d="M3 10v4"/><path d="M21 10v4"/><path d="M12 22V12"/><path d="m7 12-5-2.5"/><path d="m17 12 5-2.5"/></svg>;
-const DrinkIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M15 9l-2 3h4l-2 3"/></svg>;
-const SnackIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 11h20"/><path d="M11 11a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1Z"/><path d="M17 11v2.34a2 2 0 0 1-.3 1.06L15.17 17H8.83l-1.57-2.6a2 2 0 0 1-.3-1.06V11"/><path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/></svg>;
 
 // --- Inicialización de Firebase ---
 let app, auth, db, appId;
 try {
+    // Para desarrollo local, descomenta la siguiente línea y comenta la de Vercel
+    // const firebaseConfig = (await import('./firebaseConfig')).firebaseConfig;
+    
+    // Para Vercel
     const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
+    
     appId = firebaseConfig.appId;
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
     setLogLevel('error');
 } catch (error) {
-    console.error("Error al inicializar Firebase. Asegúrate de que las variables de entorno están configuradas en Vercel.", error);
+    console.error("Error al inicializar Firebase. Asegúrate de que las variables de entorno están configuradas.", error);
 }
 
 // --- Helper para la API de Gemini ---
@@ -54,8 +57,8 @@ const callGeminiAPI = async (prompt) => {
 const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] flex flex-col transform transition-all duration-300 scale-95 opacity-0 animate-scale-in">
                 <div className="flex justify-between items-center p-4 border-b"><h3 className="text-lg font-semibold text-gray-800">{title}</h3><button onClick={onClose} className="text-gray-500 hover:text-gray-800"><XIcon className="w-6 h-6" /></button></div>
                 <div className="p-6 overflow-y-auto">{children}</div>
             </div>
@@ -65,14 +68,11 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
 const ProductForm = ({ onClose, userId, productToEdit }) => {
     const [name, setName] = useState('');
-    const [sku, setSku] = useState('');
     const [price, setPrice] = useState('');
     const [stock, setStock] = useState('');
     const [category, setCategory] = useState('Bebestible');
-    const [description, setDescription] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
     const isEditing = !!productToEdit;
 
     const categories = ["Bebestible", "Chaparrita", "Empanada", "Pizza", "Dulce", "Papas Fritas", "Snack Saludable", "Snack No Saludable", "Otro"];
@@ -80,31 +80,18 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
     useEffect(() => {
         if (isEditing) {
             setName(productToEdit.name);
-            setSku(productToEdit.sku || '');
             setPrice(productToEdit.price.toString());
             setStock(productToEdit.stock.toString());
             setCategory(productToEdit.category || 'Otro');
-            setDescription(productToEdit.description || '');
         }
     }, [isEditing, productToEdit]);
-
-    const handleGenerateDescription = async () => {
-        if (!name) { setError('Por favor, introduce un nombre de producto primero.'); return; }
-        setIsGenerating(true); setError('');
-        try {
-            const prompt = `Crea una descripción de marketing muy corta y vendedora (máximo 10 palabras) para un producto llamado "${name}" que se vende en un estadio. Debe ser apetitosa y directa.`;
-            const generatedDesc = await callGeminiAPI(prompt);
-            setDescription(generatedDesc);
-        } catch (err) { setError('No se pudo generar la descripción.'); } 
-        finally { setIsGenerating(false); }
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!name || !price || !stock) { setError('Nombre, precio y stock son obligatorios.'); return; }
         setIsLoading(true); setError('');
         try {
-            const productData = { name, sku: sku || '', price: parseFloat(price), stock: parseInt(stock, 10), category, description: description || '' };
+            const productData = { name, price: parseFloat(price), stock: parseInt(stock, 10), category };
             if (isEditing) {
                 await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/products`, productToEdit.id), productData);
             } else {
@@ -128,14 +115,6 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
                 <select id="product-category" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm rounded-md">
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
-            </div>
-            <div>
-                <label htmlFor="product-description" className="block text-sm font-medium text-gray-700">Descripción</label>
-                <textarea id="product-description" value={description} onChange={(e) => setDescription(e.target.value)} rows="3" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"></textarea>
-                <button type="button" onClick={handleGenerateDescription} disabled={isGenerating || !name} className="mt-2 flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-pink-700 bg-pink-100 rounded-md hover:bg-pink-200 disabled:bg-gray-100">
-                    <SparklesIcon className="w-4 h-4" />
-                    {isGenerating ? 'Generando...' : '✨ Generar Descripción'}
-                </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -165,7 +144,7 @@ const InventoryPage = ({ userId }) => {
     const [productToEdit, setProductToEdit] = useState(null);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !db) return;
         const q = query(collection(db, `artifacts/${appId}/users/${userId}/products`));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const productsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -200,37 +179,34 @@ const InventoryPage = ({ userId }) => {
                 <ProductForm onClose={() => setIsModalOpen(false)} userId={userId} productToEdit={productToEdit} />
             </Modal>
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
-                <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-lg shadow-sm hover:bg-pink-700 transition-colors">
+                <h1 className="text-3xl font-bold text-gray-800">Inventario</h1>
+                <button onClick={openAddModal} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-full shadow-lg hover:bg-pink-700 transition-all transform hover:scale-105">
                     <PlusCircleIcon className="w-5 h-5" />
-                    <span className="hidden sm:inline">Agregar Producto</span>
+                    <span>Agregar Producto</span>
                 </button>
             </div>
             {isLoading ? (<p className="text-center text-gray-500 py-10">Cargando inventario...</p>) : 
              Object.keys(groupedProducts).length === 0 ? (
-                <div className="text-center py-10 px-4 bg-white rounded-lg shadow">
-                    <h3 className="text-lg font-medium text-gray-700">Tu inventario está vacío</h3>
-                    <p className="mt-1 text-gray-500">¡Agrega tu primer producto para empezar a vender!</p>
+                <div className="text-center py-16 px-4 bg-white rounded-lg shadow-md">
+                    <h3 className="text-xl font-medium text-gray-700">Tu inventario está vacío</h3>
+                    <p className="mt-2 text-gray-500">¡Agrega tu primer producto para empezar a vender!</p>
                 </div>
             ) : (
                 Object.keys(groupedProducts).sort().map(category => (
-                    <div key={category} className="bg-white rounded-lg shadow overflow-hidden">
-                        <h2 className="px-6 py-3 bg-pink-50 text-pink-800 font-bold text-sm uppercase">{category}</h2>
+                    <div key={category} className="bg-white rounded-lg shadow-md overflow-hidden">
+                        <h2 className="px-6 py-4 bg-pink-50 text-pink-800 font-bold text-md">{category}</h2>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left text-gray-600">
-                                <thead className="bg-gray-50 text-xs text-gray-700 uppercase sr-only">
-                                    <tr><th>Producto</th><th>Precio</th><th>Stock</th><th>Acciones</th></tr>
-                                </thead>
+                            <table className="w-full text-sm">
                                 <tbody>
-                                    {groupedProducts[category].map(product => (
-                                        <tr key={product.id} className="border-b hover:bg-pink-50/50">
+                                    {groupedProducts[category].map((product, index) => (
+                                        <tr key={product.id} className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-pink-50/50`}>
                                             <td className="px-6 py-4 font-medium text-gray-900">{product.name}</td>
-                                            <td className="px-6 py-4">${product.price.toFixed(2)}</td>
-                                            <td className={`px-6 py-4 font-semibold ${product.stock <= 5 ? 'text-red-500' : 'text-green-600'}`}>{product.stock}</td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 text-gray-600">${product.price.toFixed(2)}</td>
+                                            <td className={`px-6 py-4 font-semibold text-right ${product.stock <= 5 ? 'text-red-500' : 'text-green-600'}`}>{product.stock} <span className="text-xs text-gray-400">unid.</span></td>
+                                            <td className="px-6 py-4 w-28">
                                                 <div className="flex justify-end items-center gap-2">
-                                                    <button onClick={() => openEditModal(product)} className="p-2 text-gray-500 hover:text-pink-600 hover:bg-pink-100 rounded-full"><EditIcon className="w-4 h-4" /></button>
-                                                    <button onClick={() => handleDelete(product.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full"><Trash2Icon className="w-4 h-4" /></button>
+                                                    <button onClick={() => openEditModal(product)} className="p-2 text-gray-500 hover:text-pink-600 hover:bg-pink-100 rounded-full transition-colors"><EditIcon className="w-4 h-4" /></button>
+                                                    <button onClick={() => handleDelete(product.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"><Trash2Icon className="w-4 h-4" /></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -254,7 +230,7 @@ const SalesPage = ({ userId }) => {
     const totalSalesValue = useMemo(() => sales.reduce((sum, sale) => sum + sale.totalPrice, 0), [sales]);
 
     useEffect(() => {
-        if (!userId) return;
+        if (!userId || !db) return;
         const salesQuery = query(collection(db, `artifacts/${appId}/users/${userId}/sales`));
         const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
             const salesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -275,38 +251,37 @@ const SalesPage = ({ userId }) => {
                 <SalesForm userId={userId} products={products} onClose={() => setIsSaleModalOpen(false)} />
             </Modal>
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-800">Ventas</h1>
-                <button onClick={() => setIsSaleModalOpen(true)} disabled={products.filter(p => p.stock > 0).length === 0} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-lg shadow-sm hover:bg-pink-700 disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors">
+                <h1 className="text-3xl font-bold text-gray-800">Ventas</h1>
+                 <button onClick={() => setIsSaleModalOpen(true)} disabled={products.filter(p => p.stock > 0).length === 0} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-full shadow-lg hover:bg-pink-700 disabled:bg-pink-300 disabled:cursor-not-allowed transition-all transform hover:scale-105">
                     <PlusCircleIcon className="w-5 h-5" />
-                    <span className="hidden sm:inline">Nueva Venta</span>
+                    <span>Nueva Venta</span>
                 </button>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-sm font-medium text-gray-500">Total de Ventas</h3>
-                <p className="mt-1 text-3xl font-semibold text-pink-600">${totalSalesValue.toFixed(2)}</p>
+            <div className="bg-white p-6 rounded-lg shadow-md text-center">
+                <h3 className="text-md font-medium text-gray-500">Total Recaudado</h3>
+                <p className="mt-1 text-4xl font-bold text-pink-600">${totalSalesValue.toFixed(2)}</p>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-                 <h2 className="px-6 py-3 bg-pink-50 text-pink-800 font-bold text-sm uppercase">Historial de Ventas</h2>
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                 <h2 className="px-6 py-4 bg-pink-50 text-pink-800 font-bold text-md">Historial de Ventas</h2>
                 <div className="overflow-x-auto">
                     {isLoading ? (<p className="p-6 text-center text-gray-500">Cargando ventas...</p>) : 
                      sales.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500">
+                        <div className="p-8 text-center text-gray-500">
                             <h3 className="text-lg font-medium">No hay ventas registradas</h3>
                             <p className="mt-1">¡Realiza tu primera venta para verla aquí!</p>
                         </div>
                     ) : (
-                        <table className="w-full text-sm text-left text-gray-600">
-                            <thead className="bg-gray-50 text-xs text-gray-700 uppercase sr-only">
-                                <tr><th>Producto</th><th>Fecha</th><th>Cantidad</th><th>Total</th></tr>
-                            </thead>
+                        <table className="w-full text-sm">
                             <tbody>
-                                {sales.map(sale => (
-                                    <tr key={sale.id} className="border-b hover:bg-pink-50/50">
-                                        <td className="px-6 py-4 font-medium text-gray-900">{sale.productName}</td>
-                                        <td className="px-6 py-4 hidden sm:table-cell text-gray-500">{new Date(sale.saleDate.seconds * 1000).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4 text-center">{sale.quantity}</td>
+                                {sales.map((sale, index) => (
+                                    <tr key={sale.id} className={`border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-pink-50/50`}>
+                                        <td className="px-6 py-4 font-medium text-gray-900">
+                                            {sale.productName}
+                                            <span className="ml-2 text-gray-400">x{sale.quantity}</span>
+                                        </td>
+                                        <td className="px-6 py-4 hidden sm:table-cell text-gray-500 text-right">{new Date(sale.saleDate.seconds * 1000).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 font-semibold text-gray-800 text-right">${sale.totalPrice.toFixed(2)}</td>
                                     </tr>
                                 ))}
@@ -346,30 +321,37 @@ export default function App() {
     );
 
     if (!auth) {
-        return (<div className="flex items-center justify-center h-screen bg-gray-50 p-4 text-center"><p className="text-red-600 font-semibold">Error de Configuración: No se pudo inicializar Firebase. Revisa las variables de entorno en Vercel.</p></div>);
+        return (<div className="flex items-center justify-center h-screen bg-pink-50 p-4 text-center"><p className="text-red-600 font-semibold">Error de Configuración: No se pudo inicializar Firebase. Revisa las variables de entorno en Vercel.</p></div>);
     }
     if (!isAuthReady) {
-        return (<div className="flex items-center justify-center h-screen bg-gray-50"><p className="text-gray-600">Conectando de forma segura...</p></div>);
+        return (<div className="flex items-center justify-center h-screen bg-pink-50"><p className="text-pink-700">Conectando a Palelu Spa...</p></div>);
     }
     
     return (
-        <div className="min-h-screen bg-gray-100 font-sans">
-            <header className="bg-white shadow-sm sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-pink-50/50 font-sans">
+            <style>{`
+                @keyframes scale-in {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
+            `}</style>
+            <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-10">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-3">
                         <div className="flex items-center gap-3">
                            <div className="bg-pink-600 p-2 rounded-lg shadow"><PizzaIcon className="w-6 h-6 text-white" /></div>
-                           <h1 className="text-xl font-bold text-gray-800 hidden sm:block">Palelu Spa - Punto de Venta</h1>
+                           <h1 className="text-xl font-bold text-gray-800">Palelu Spa</h1>
                         </div>
                          <div className="text-xs text-gray-500 text-right">
-                           <p>ID de Sesión:</p>
+                           <p>ID de Vendedor:</p>
                            <p className="font-mono break-all">{userId}</p>
                         </div>
                     </div>
                 </div>
             </header>
-            <main className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-4">
-                <div className="bg-white sm:rounded-lg shadow-md p-2 sm:p-4 mb-6">
+            <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div className="bg-white sm:rounded-lg shadow-md p-2 sm:p-4 mb-8">
                     <nav className="flex space-x-2">
                         <NavButton active={page === 'inventory'} onClick={() => setPage('inventory')} icon={PackageIcon}>Inventario</NavButton>
                         <NavButton active={page === 'sales'} onClick={() => setPage('sales')} icon={ShoppingCartIcon}>Ventas</NavButton>
@@ -380,8 +362,8 @@ export default function App() {
                     {page === 'sales' && <SalesPage userId={userId} />}
                 </div>
             </main>
-            <footer className="text-center py-4 mt-8">
-                <p className="text-xs text-gray-500">Potenciado con IA de Gemini. Creado para una gestión simple.</p>
+            <footer className="text-center py-6">
+                <p className="text-xs text-pink-900/50">Punto de Venta v1.0</p>
             </footer>
         </div>
     );
