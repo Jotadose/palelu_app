@@ -17,7 +17,7 @@ import {
     query
 } from 'firebase/firestore';
 import { setLogLevel } from "firebase/firestore";
-import { firebaseConfig } from './firebaseConfig';
+
 
 // --- Íconos (SVGs en línea para simplicidad) ---
 const PackageIcon = (props) => (
@@ -62,6 +62,7 @@ const SparklesIcon = (props) => (
 );
 
 // --- Configuración de Firebase ---
+const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
 const appId = firebaseConfig.appId;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -70,10 +71,10 @@ setLogLevel('error');
 
 // --- Helper para la API de Gemini ---
 const callGeminiAPI = async (prompt) => {
-    // IMPORTANTE: Pega tu clave de API de Google AI Studio aquí.
-    const apiKey = "AIzaSyCGxblVpr3bhVbpryhG2HPFF-pUNIwbdOg"; 
+    // Lee la clave de API desde las Variables de Entorno de Vercel
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
+    
     const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
 
     try {
