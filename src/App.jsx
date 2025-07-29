@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+} from "firebase/auth";
 import {
   getFirestore,
   collection,
@@ -15,11 +20,7 @@ import {
 import { setLogLevel } from "firebase/firestore";
 
 // --- Configuración de Firebase ---
-// Para desarrollo local, asegúrate de tener este archivo y la línea descomentada
-// import { firebaseConfig } from "./firebaseConfig";
-
-// Para desplegar en Vercel, comenta la línea de arriba y descomenta la de abajo
-const firebaseConfig = JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG);
+import { firebaseConfig } from "./firebaseConfig";
 
 // --- Íconos Temáticos ---
 const PizzaIcon = (props) => (
@@ -151,6 +152,24 @@ const PackageIcon = (props) => (
     <path d="m17 12 5-2.5" />
   </svg>
 );
+const LogOutIcon = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
 
 // --- Inicialización de Firebase ---
 let app, auth, db, appId;
@@ -161,18 +180,15 @@ try {
   db = getFirestore(app);
   setLogLevel("error");
 } catch (error) {
-  console.error(
-    "Error al inicializar Firebase. Asegúrate de que las variables de entorno están configuradas.",
-    error
-  );
+  console.error("Error al inicializar Firebase.", error);
 }
 
 // --- Componentes de la UI ---
 const Modal = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] flex flex-col transform transition-all duration-300 scale-95 opacity-0 animate-scale-in">
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
           <button
@@ -196,7 +212,6 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!productToEdit;
-
   const categories = [
     "🥤 Bebestible",
     "🥖 Chaparrita",
@@ -233,20 +248,14 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
         stock: parseInt(stock, 10),
         category,
       };
+      const collectionPath = `artifacts/${appId}/public/data/products`; // RUTA PÚBLICA
       if (isEditing) {
-        await updateDoc(
-          doc(
-            db,
-            `artifacts/${appId}/users/${userId}/products`,
-            productToEdit.id
-          ),
-          productData
-        );
+        await updateDoc(doc(db, collectionPath, productToEdit.id), productData);
       } else {
-        await addDoc(
-          collection(db, `artifacts/${appId}/users/${userId}/products`),
-          { ...productData, createdAt: new Date() }
-        );
+        await addDoc(collection(db, collectionPath), {
+          ...productData,
+          createdAt: new Date(),
+        });
       }
       onClose();
     } catch (err) {
@@ -354,25 +363,21 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
   );
 };
 
-const InventoryPage = ({ userId }) => {
+const InventoryPage = ({ user }) => {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
 
   useEffect(() => {
-    if (!userId || !db) return;
-    const q = query(
-      collection(db, `artifacts/${appId}/users/${userId}/products`)
-    );
+    if (!user || !db) return;
+    const q = query(collection(db, `artifacts/${appId}/public/data/products`)); // RUTA PÚBLICA
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const productsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setProducts(productsData);
+        setProducts(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+        );
         setIsLoading(false);
       },
       (error) => {
@@ -381,7 +386,7 @@ const InventoryPage = ({ userId }) => {
       }
     );
     return () => unsubscribe();
-  }, [userId]);
+  }, [user]);
 
   const groupedProducts = useMemo(() => {
     if (products.length === 0) return {};
@@ -402,12 +407,10 @@ const InventoryPage = ({ userId }) => {
     setIsModalOpen(true);
   };
   const handleDelete = async (productId) => {
-    if (
-      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
-    ) {
+    if (window.confirm("¿Estás seguro?")) {
       try {
         await deleteDoc(
-          doc(db, `artifacts/${appId}/users/${userId}/products`, productId)
+          doc(db, `artifacts/${appId}/public/data/products`, productId)
         );
       } catch (error) {
         console.error("Error al eliminar producto:", error);
@@ -424,7 +427,7 @@ const InventoryPage = ({ userId }) => {
       >
         <ProductForm
           onClose={() => setIsModalOpen(false)}
-          userId={userId}
+          userId={user.uid}
           productToEdit={productToEdit}
         />
       </Modal>
@@ -533,9 +536,8 @@ const SalesForm = ({ userId, products, onClose }) => {
     setError("");
     try {
       const batch = writeBatch(db);
-      const saleRef = doc(
-        collection(db, `artifacts/${appId}/users/${userId}/sales`)
-      );
+      const collectionPath = `artifacts/${appId}/public/data/sales`; // RUTA PÚBLICA
+      const saleRef = doc(collection(db, collectionPath));
       batch.set(saleRef, {
         productId: product.id,
         productName: product.name,
@@ -543,10 +545,11 @@ const SalesForm = ({ userId, products, onClose }) => {
         pricePerUnit: product.price,
         totalPrice: product.price * quantity,
         saleDate: new Date(),
+        sellerId: userId, // Guardamos quién hizo la venta
       });
       const productRef = doc(
         db,
-        `artifacts/${appId}/users/${userId}/products`,
+        `artifacts/${appId}/public/data/products`,
         product.id
       );
       batch.update(productRef, { stock: product.stock - Number(quantity) });
@@ -634,7 +637,7 @@ const SalesForm = ({ userId, products, onClose }) => {
   );
 };
 
-const SalesPage = ({ userId }) => {
+const SalesPage = ({ user }) => {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -646,10 +649,10 @@ const SalesPage = ({ userId }) => {
   );
 
   useEffect(() => {
-    if (!userId || !db) return;
+    if (!user || !db) return;
     const salesQuery = query(
-      collection(db, `artifacts/${appId}/users/${userId}/sales`)
-    );
+      collection(db, `artifacts/${appId}/public/data/sales`)
+    ); // RUTA PÚBLICA
     const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
       const salesData = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -660,8 +663,8 @@ const SalesPage = ({ userId }) => {
       setIsLoading(false);
     });
     const productsQuery = query(
-      collection(db, `artifacts/${appId}/users/${userId}/products`)
-    );
+      collection(db, `artifacts/${appId}/public/data/products`)
+    ); // RUTA PÚBLICA
     const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
       setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
@@ -669,17 +672,17 @@ const SalesPage = ({ userId }) => {
       unsubscribeSales();
       unsubscribeProducts();
     };
-  }, [userId]);
+  }, [user]);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="space-y-6">
       <Modal
         isOpen={isSaleModalOpen}
         onClose={() => setIsSaleModalOpen(false)}
         title="Registrar Nueva Venta"
       >
         <SalesForm
-          userId={userId}
+          userId={user.uid}
           products={products}
           onClose={() => setIsSaleModalOpen(false)}
         />
@@ -750,26 +753,92 @@ const SalesPage = ({ userId }) => {
   );
 };
 
-// --- Componente Principal de la App ---
-export default function App() {
-  const [page, setPage] = useState("inventory");
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+const LoginPage = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!auth) return;
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserId(user.uid);
-      } else {
-        signInAnonymously(auth).catch((error) =>
-          console.error("Error en el inicio de sesión anónimo:", error)
-        );
-      }
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
-  }, []);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      setError("Correo o contraseña incorrectos.");
+      console.error("Error de inicio de sesión:", error);
+    }
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-pink-50/50">
+      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
+        <div className="text-center">
+          <div className="inline-block bg-pink-600 p-3 rounded-full shadow-md">
+            <PizzaIcon className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="mt-4 text-3xl font-bold text-gray-800">Palelu Spa</h1>
+          <p className="text-gray-500">Punto de Venta</p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="sr-only">
+              Correo Electrónico
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+              placeholder="Correo Electrónico"
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="sr-only">
+              Contraseña
+            </label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+              placeholder="Contraseña"
+            />
+          </div>
+          {error && <p className="text-sm text-center text-red-600">{error}</p>}
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:bg-pink-300"
+            >
+              {isLoading ? "Ingresando..." : "Ingresar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const AppContent = ({ user }) => {
+  const [page, setPage] = useState("inventory");
+
+  const handleLogout = () => {
+    signOut(auth).catch((error) =>
+      console.error("Error al cerrar sesión:", error)
+    );
+  };
 
   const NavButton = ({ active, onClick, children, icon: Icon }) => (
     <button
@@ -782,24 +851,6 @@ export default function App() {
       <span className="hidden sm:inline">{children}</span>
     </button>
   );
-
-  if (!auth) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-pink-50 p-4 text-center">
-        <p className="text-red-600 font-semibold">
-          Error de Configuración: No se pudo inicializar Firebase. Revisa las
-          variables de entorno en Vercel.
-        </p>
-      </div>
-    );
-  }
-  if (!isAuthReady) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-pink-50">
-        <p className="text-pink-700">Conectando a Palelu Spa...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-pink-50/50 font-sans">
@@ -814,14 +865,23 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 bg-white/20 rounded-full flex items-center justify-center border-2 border-white/50">
-                <PizzaIcon className="w-7 h-7 text-white" />
-              </div>
+              <img
+                src="/paleluapp.png"
+                alt="Palelu Spa Logo"
+                className="h-12 w-12 rounded-full"
+              />
               <h1 className="text-2xl font-bold tracking-tight">Palelu Spa</h1>
             </div>
-            <div className="text-xs text-white/80 text-right">
-              <p>ID de Vendedor:</p>
-              <p className="font-mono break-all text-white">{userId}</p>
+            <div className="flex items-center gap-4">
+              <div className="text-xs text-white/80 text-right">
+                <p>{user.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <LogOutIcon className="w-5 h-5 text-white" />
+              </button>
             </div>
           </div>
         </div>
@@ -846,8 +906,8 @@ export default function App() {
           </nav>
         </div>
         <div>
-          {page === "inventory" && <InventoryPage userId={userId} />}
-          {page === "sales" && <SalesPage userId={userId} />}
+          {page === "inventory" && <InventoryPage user={user} />}
+          {page === "sales" && <SalesPage user={user} />}
         </div>
       </main>
       <footer className="text-center py-6">
@@ -855,4 +915,32 @@ export default function App() {
       </footer>
     </div>
   );
+};
+
+// --- Componente Principal de la App ---
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  useEffect(() => {
+    if (!auth) {
+      setIsAuthReady(true);
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  if (!isAuthReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-pink-50">
+        <p className="text-pink-700">Conectando a Palelu Spa...</p>
+      </div>
+    );
+  }
+
+  return user ? <AppContent user={user} /> : <LoginPage />;
 }
