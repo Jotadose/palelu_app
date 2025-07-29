@@ -75,7 +75,7 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
     const [isLoading, setIsLoading] = useState(false);
     const isEditing = !!productToEdit;
 
-    const categories = ["Bebestible", "Chaparrita", "Empanada", "Pizza", "Dulce", "Papas Fritas", "Snack Saludable", "Snack No Saludable", "Otro"];
+    const categories = ["🥤 Bebestible", " 🥖 Chaparrita", "🥟 Empanada", "🍕 Pizza", "🍬 Dulce", "🍟 Papas Fritas", "🥙 Snack Saludable", "🥓 Snack No Saludable", "🍪 Otro"];
 
     useEffect(() => {
         if (isEditing) {
@@ -107,22 +107,22 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label htmlFor="product-name" className="block text-sm font-medium text-gray-700">Nombre del Producto</label>
+                <label htmlFor="product-name" className="block text-sm font-medium text-gray-700">✍️ Nombre del Producto</label>
                 <input id="product-name" type="text" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500" required />
             </div>
             <div>
-                <label htmlFor="product-category" className="block text-sm font-medium text-gray-700">Categoría</label>
+                <label htmlFor="product-category" className="block text-sm font-medium text-gray-700">🗃️ Categoría</label>
                 <select id="product-category" value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm rounded-md">
                     {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label htmlFor="product-price" className="block text-sm font-medium text-gray-700">Precio</label>
+                    <label htmlFor="product-price" className="block text-sm font-medium text-gray-700">💸 Precio</label>
                     <input id="product-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} min="0" step="0.01" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500" required />
                 </div>
                 <div>
-                    <label htmlFor="product-stock" className="block text-sm font-medium text-gray-700">Stock</label>
+                    <label htmlFor="product-stock" className="block text-sm font-medium text-gray-700">📦 Stock</label>
                     <input id="product-stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} min="0" step="1" className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500" required />
                 </div>
             </div>
@@ -188,7 +188,7 @@ const InventoryPage = ({ userId }) => {
             {isLoading ? (<p className="text-center text-gray-500 py-10">Cargando inventario...</p>) : 
              Object.keys(groupedProducts).length === 0 ? (
                 <div className="text-center py-16 px-4 bg-white rounded-lg shadow-md">
-                    <h3 className="text-xl font-medium text-gray-700">Tu inventario está vacío</h3>
+                    <h3 className="text-xl font-medium text-gray-700">Tu inventario está vacío </h3>
                     <p className="mt-2 text-gray-500">¡Agrega tu primer producto para empezar a vender!</p>
                 </div>
             ) : (
@@ -336,20 +336,24 @@ export default function App() {
                 }
                 .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
             `}</style>
-            <header className="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-10">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between items-center py-3">
-                        <div className="flex items-center gap-3">
-                           <div className="bg-pink-600 p-2 rounded-lg shadow"><PizzaIcon className="w-6 h-6 text-white" /></div>
-                           <h1 className="text-xl font-bold text-gray-800">Palelu Spa</h1>
-                        </div>
-                         <div className="text-xs text-gray-500 text-right">
-                           <p>ID de Vendedor:</p>
-                           <p className="font-mono break-all">{userId}</p>
+                <header className="bg-gradient-to-r from-pink-600 to-rose-500 shadow-lg sticky top-0 z-10 text-white">
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between items-center py-3">
+                            {/* --- Lado Izquierdo: Logo y Título --- */}
+                            <div className="flex items-center gap-4">
+                                <img src="src\assets\img\paleluapp.png" alt="Palelu Spa Logo" className="h-12 w-12 rounded-full" />
+                                
+                                <h1 className="text-2xl font-bold tracking-tight">Palelu Spa</h1>
+                            </div>
+
+                            {/* --- Lado Derecho: ID de Vendedor --- */}
+                            <div className="text-xs text-white/80 text-right">
+                                <p>ID de Vendedor:</p>
+                                <p className="font-mono break-all text-white">{userId}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </header>
+                </header>
             <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="bg-white sm:rounded-lg shadow-md p-2 sm:p-4 mb-8">
                     <nav className="flex space-x-2">
