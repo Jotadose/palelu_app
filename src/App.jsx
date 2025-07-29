@@ -341,7 +341,7 @@ export default function App() {
                         <div className="flex justify-between items-center py-3">
                             {/* --- Lado Izquierdo: Logo y Título --- */}
                             <div className="flex items-center gap-4">
-                                <img src="public\paleluapp.png" alt="Palelu Spa Logo" className="h-12 w-12 rounded-full" />
+                                <img src="/paleluapp.png" alt="Palelu Spa Logo" className="h-12 w-12 rounded-full" />
                                 
                                 <h1 className="text-2xl font-bold tracking-tight">Palelu Spa</h1>
                             </div>
