@@ -363,7 +363,7 @@ export default function App() {
                 </div>
             </main>
             <footer className="text-center py-6">
-                <p className="text-xs text-pink-900/50">Punto de Venta v1.0</p>
+                <p className="text-xs text-pink-900/50">Palelu App v1.0</p>
             </footer>
         </div>
     );
