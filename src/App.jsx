@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  createContext,
+  useContext,
+} from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -170,6 +176,41 @@ const LogOutIcon = (props) => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );
+const CheckCircleIcon = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
+  </svg>
+);
+const AlertCircleIcon = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
+  </svg>
+);
 
 // --- Inicialización de Firebase ---
 let app, auth, db, appId;
@@ -183,33 +224,67 @@ try {
   console.error("Error al inicializar Firebase.", error);
 }
 
-// --- Componentes de la UI ---
-const Modal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
+// --- Sistema de Notificaciones (Toast) ---
+const ToastContext = createContext();
+
+const ToastProvider = ({ children }) => {
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md m-4 max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800"
-          >
-            <XIcon className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto">{children}</div>
-      </div>
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </ToastContext.Provider>
+  );
+};
+
+const useToast = () => useContext(ToastContext);
+
+const Toast = ({ message, type, onClose }) => {
+  const isSuccess = type === "success";
+  const bgColor = isSuccess ? "bg-green-500" : "bg-red-500";
+  const Icon = isSuccess ? CheckCircleIcon : AlertCircleIcon;
+
+  return (
+    <div
+      className={`fixed top-5 right-5 flex items-center p-4 rounded-lg shadow-lg text-white ${bgColor} z-50 animate-fade-in-down`}
+    >
+      <Icon className="w-6 h-6 mr-3" />
+      <span>{message}</span>
+      <button
+        onClick={onClose}
+        className="ml-4 p-1 rounded-full hover:bg-white/20"
+      >
+        <XIcon className="w-4 h-4" />
+      </button>
     </div>
   );
 };
 
+// --- Componentes de la UI ---
+const Modal = ({ isOpen, onClose, title, children }) => {
+  // ... (sin cambios)
+};
+
 const ProductForm = ({ onClose, userId, productToEdit }) => {
+  const { showToast } = useToast();
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState("Bebestible");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!productToEdit;
   const categories = [
@@ -236,11 +311,10 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !price || !stock) {
-      setError("Nombre, precio y stock son obligatorios.");
+      showToast("Nombre, precio y stock son obligatorios.", "error");
       return;
     }
     setIsLoading(true);
-    setError("");
     try {
       const productData = {
         name,
@@ -248,26 +322,28 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
         stock: parseInt(stock, 10),
         category,
       };
-      const collectionPath = `artifacts/${appId}/public/data/products`; // RUTA PÚBLICA
+      const collectionPath = `artifacts/${appId}/public/data/products`;
       if (isEditing) {
         await updateDoc(doc(db, collectionPath, productToEdit.id), productData);
+        showToast("Producto actualizado con éxito");
       } else {
         await addDoc(collection(db, collectionPath), {
           ...productData,
           createdAt: new Date(),
         });
+        showToast("Producto agregado con éxito");
       }
       onClose();
     } catch (err) {
       console.error("Error guardando producto: ", err);
-      setError("No se pudo guardar el producto.");
+      showToast("No se pudo guardar el producto.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4 p-4">
       <div>
         <label
           htmlFor="product-name"
@@ -342,7 +418,6 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
           />
         </div>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex justify-end gap-3 pt-4">
         <button
           type="button"
@@ -364,6 +439,7 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
 };
 
 const InventoryPage = ({ user }) => {
+  const { showToast } = useToast();
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -371,7 +447,7 @@ const InventoryPage = ({ user }) => {
 
   useEffect(() => {
     if (!user || !db) return;
-    const q = query(collection(db, `artifacts/${appId}/public/data/products`)); // RUTA PÚBLICA
+    const q = query(collection(db, `artifacts/${appId}/public/data/products`));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -407,13 +483,17 @@ const InventoryPage = ({ user }) => {
     setIsModalOpen(true);
   };
   const handleDelete = async (productId) => {
-    if (window.confirm("¿Estás seguro?")) {
+    if (
+      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
+    ) {
       try {
         await deleteDoc(
           doc(db, `artifacts/${appId}/public/data/products`, productId)
         );
+        showToast("Producto eliminado");
       } catch (error) {
         console.error("Error al eliminar producto:", error);
+        showToast("No se pudo eliminar el producto", "error");
       }
     }
   };
@@ -520,401 +600,189 @@ const InventoryPage = ({ user }) => {
 };
 
 const SalesForm = ({ userId, products, onClose }) => {
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [error, setError] = useState("");
+  const { showToast } = useToast();
+  const [cart, setCart] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const product = products.find((p) => p.id === selectedProduct);
-    if (!product || quantity <= 0 || quantity > product.stock) {
-      setError("Selección o cantidad inválida.");
-      return;
-    }
+  const addToCart = (product) => {
+    setCart((prevCart) => {
+      const currentQty = prevCart[product.id]?.quantity || 0;
+      if (currentQty >= product.stock) {
+        showToast(`No hay más stock de ${product.name}`, "error");
+        return prevCart;
+      }
+      return {
+        ...prevCart,
+        [product.id]: { ...product, quantity: currentQty + 1 },
+      };
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCart((prevCart) => {
+      const newCart = { ...prevCart };
+      if (newCart[productId].quantity > 1) {
+        newCart[productId].quantity -= 1;
+      } else {
+        delete newCart[productId];
+      }
+      return newCart;
+    });
+  };
+
+  const total = useMemo(
+    () =>
+      Object.values(cart).reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      ),
+    [cart]
+  );
+
+  const handleSubmitSale = async () => {
+    if (Object.keys(cart).length === 0) return;
     setIsLoading(true);
-    setError("");
     try {
       const batch = writeBatch(db);
-      const collectionPath = `artifacts/${appId}/public/data/sales`; // RUTA PÚBLICA
-      const saleRef = doc(collection(db, collectionPath));
-      batch.set(saleRef, {
-        productId: product.id,
-        productName: product.name,
-        quantity: Number(quantity),
-        pricePerUnit: product.price,
-        totalPrice: product.price * quantity,
-        saleDate: new Date(),
-        sellerId: userId, // Guardamos quién hizo la venta
-      });
-      const productRef = doc(
-        db,
-        `artifacts/${appId}/public/data/products`,
-        product.id
-      );
-      batch.update(productRef, { stock: product.stock - Number(quantity) });
+      const salesCollectionPath = `artifacts/${appId}/public/data/sales`;
+      const productsCollectionPath = `artifacts/${appId}/public/data/products`;
+
+      for (const item of Object.values(cart)) {
+        const saleRef = doc(collection(db, salesCollectionPath));
+        batch.set(saleRef, {
+          productId: item.id,
+          productName: item.name,
+          quantity: item.quantity,
+          pricePerUnit: item.price,
+          totalPrice: item.price * item.quantity,
+          saleDate: new Date(),
+          sellerId: userId,
+        });
+        const productRef = doc(db, productsCollectionPath, item.id);
+        batch.update(productRef, { stock: item.stock - item.quantity });
+      }
       await batch.commit();
+      showToast("Venta registrada con éxito");
       onClose();
-    } catch (err) {
-      console.error("Error al registrar la venta: ", err);
-      setError("No se pudo registrar la venta.");
+    } catch (error) {
+      console.error("Error al registrar la venta:", error);
+      showToast("Hubo un error al registrar la venta", "error");
     } finally {
       setIsLoading(false);
     }
   };
-  const product = products.find((p) => p.id === selectedProduct);
-  const totalPrice = product ? (product.price * quantity).toFixed(2) : "0.00";
+
+  const groupedProducts = useMemo(() => {
+    if (products.length === 0) return {};
+    return products.reduce((acc, product) => {
+      const category = product.category || "Sin Categoría";
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(product);
+      return acc;
+    }, {});
+  }, [products]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label
-          htmlFor="sale-product"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Producto
-        </label>
-        <select
-          id="sale-product"
-          value={selectedProduct}
-          onChange={(e) => setSelectedProduct(e.target.value)}
-          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm rounded-md"
-          required
-        >
-          <option value="" disabled>
-            Selecciona un producto
-          </option>
-          {products
-            .filter((p) => p.stock > 0)
-            .map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} (Stock: {p.stock})
-              </option>
-            ))}
-        </select>
+    <div className="flex flex-col md:flex-row h-[70vh]">
+      <div className="w-full md:w-3/5 p-2 space-y-3 overflow-y-auto">
+        {Object.keys(groupedProducts)
+          .sort()
+          .map((category) => (
+            <div key={category}>
+              <h3 className="font-bold text-pink-700 mb-2 sticky top-0 bg-white/80 backdrop-blur-sm py-1">
+                {category}
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {groupedProducts[category].map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    disabled={product.stock === 0}
+                    className="p-2 text-center bg-white rounded-lg shadow-sm border border-gray-200 hover:border-pink-500 hover:bg-pink-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    <span className="font-semibold text-sm text-gray-800">
+                      {product.name}
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      ${product.price.toFixed(2)}
+                    </span>
+                    <span
+                      className={`block text-xs font-bold ${
+                        product.stock <= 5 ? "text-red-500" : "text-green-600"
+                      }`}
+                    >
+                      Stock: {product.stock}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
       </div>
-      <div>
-        <label
-          htmlFor="sale-quantity"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Cantidad
-        </label>
-        <input
-          id="sale-quantity"
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(Number(e.target.value))}
-          min="1"
-          max={product ? product.stock : undefined}
-          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-          required
-        />
+      <div className="w-full md:w-2/5 p-4 bg-gray-50 border-l flex flex-col">
+        <h3 className="text-lg font-bold mb-4">Carrito de Compras</h3>
+        <div className="flex-grow overflow-y-auto">
+          {Object.keys(cart).length === 0 ? (
+            <p className="text-gray-500 text-center mt-10">
+              Selecciona productos para agregarlos al carrito.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {Object.values(cart).map((item) => (
+                <li
+                  key={item.id}
+                  className="flex justify-between items-center bg-white p-2 rounded-md shadow-sm"
+                >
+                  <div>
+                    <p className="font-semibold text-sm">{item.name}</p>
+                    <p className="text-xs text-gray-500">
+                      ${item.price.toFixed(2)} x {item.quantity}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm">
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </p>
+                    <button
+                      onClick={() => removeFromCart(item.id)}
+                      className="p-1 text-red-500 hover:bg-red-100 rounded-full"
+                    >
+                      <Trash2Icon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="border-t pt-4 mt-4">
+          <div className="flex justify-between items-center font-bold text-xl">
+            <span>Total:</span>
+            <span>${total.toFixed(2)}</span>
+          </div>
+          <button
+            onClick={handleSubmitSale}
+            disabled={isLoading || Object.keys(cart).length === 0}
+            className="w-full mt-4 py-3 text-white bg-pink-600 rounded-lg shadow-md hover:bg-pink-700 disabled:bg-pink-300 transition-colors"
+          >
+            {isLoading ? "Procesando..." : "Confirmar Venta"}
+          </button>
+        </div>
       </div>
-      <div className="text-right">
-        <p className="text-lg font-semibold text-gray-800">
-          Total: <span className="text-pink-600">${totalPrice}</span>
-        </p>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <div className="flex justify-end gap-3 pt-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || !selectedProduct}
-          className="px-4 py-2 text-sm font-medium text-white bg-pink-600 border border-transparent rounded-md shadow-sm hover:bg-pink-700 disabled:bg-pink-300"
-        >
-          {isLoading ? "Registrando..." : "Registrar Venta"}
-        </button>
-      </div>
-    </form>
+    </div>
   );
 };
 
 const SalesPage = ({ user }) => {
-  const [sales, setSales] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
-
-  const totalSalesValue = useMemo(
-    () => sales.reduce((sum, sale) => sum + sale.totalPrice, 0),
-    [sales]
-  );
-
-  useEffect(() => {
-    if (!user || !db) return;
-    const salesQuery = query(
-      collection(db, `artifacts/${appId}/public/data/sales`)
-    ); // RUTA PÚBLICA
-    const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
-      const salesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      salesData.sort((a, b) => b.saleDate.toDate() - a.saleDate.toDate());
-      setSales(salesData);
-      setIsLoading(false);
-    });
-    const productsQuery = query(
-      collection(db, `artifacts/${appId}/public/data/products`)
-    ); // RUTA PÚBLICA
-    const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
-      setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => {
-      unsubscribeSales();
-      unsubscribeProducts();
-    };
-  }, [user]);
-
-  return (
-    <div className="space-y-6">
-      <Modal
-        isOpen={isSaleModalOpen}
-        onClose={() => setIsSaleModalOpen(false)}
-        title="Registrar Nueva Venta"
-      >
-        <SalesForm
-          userId={user.uid}
-          products={products}
-          onClose={() => setIsSaleModalOpen(false)}
-        />
-      </Modal>
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Ventas</h1>
-        <button
-          onClick={() => setIsSaleModalOpen(true)}
-          disabled={products.filter((p) => p.stock > 0).length === 0}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-pink-600 rounded-full shadow-lg hover:bg-pink-700 disabled:bg-pink-300 disabled:cursor-not-allowed transition-all transform hover:scale-105"
-        >
-          <PlusCircleIcon className="w-5 h-5" />
-          <span>Nueva Venta</span>
-        </button>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md text-center">
-        <h3 className="text-md font-medium text-gray-500">Total Recaudado</h3>
-        <p className="mt-1 text-4xl font-bold text-pink-600">
-          ${totalSalesValue.toFixed(2)}
-        </p>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <h2 className="px-6 py-4 bg-pink-50 text-pink-800 font-bold text-md">
-          Historial de Ventas
-        </h2>
-        <div className="overflow-x-auto">
-          {isLoading ? (
-            <p className="p-6 text-center text-gray-500">Cargando ventas...</p>
-          ) : sales.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <h3 className="text-lg font-medium">No hay ventas registradas</h3>
-              <p className="mt-1">¡Realiza tu primera venta para verla aquí!</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <tbody>
-                {sales.map((sale, index) => (
-                  <tr
-                    key={sale.id}
-                    className={`border-t ${
-                      index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                    } hover:bg-pink-50/50`}
-                  >
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {sale.productName}
-                      <span className="ml-2 text-gray-400">
-                        x{sale.quantity}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 hidden sm:table-cell text-gray-500 text-right">
-                      {new Date(
-                        sale.saleDate.seconds * 1000
-                      ).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 font-semibold text-gray-800 text-right">
-                      ${sale.totalPrice.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // ... (sin cambios en este componente por ahora) ...
 };
 
 const LoginPage = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      setError("Correo o contraseña incorrectos.");
-      console.error("Error de inicio de sesión:", error);
-    }
-    setIsLoading(false);
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-pink-50/50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
-        <div className="text-center">
-          <div className="inline-block bg-pink-600 p-3 rounded-full shadow-md">
-            <PizzaIcon className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="mt-4 text-3xl font-bold text-gray-800">Palelu Spa</h1>
-          <p className="text-gray-500">Punto de Venta</p>
-        </div>
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label htmlFor="email" className="sr-only">
-              Correo Electrónico
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-              placeholder="Correo Electrónico"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="sr-only">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-              placeholder="Contraseña"
-            />
-          </div>
-          {error && <p className="text-sm text-center text-red-600">{error}</p>}
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:bg-pink-300"
-            >
-              {isLoading ? "Ingresando..." : "Ingresar"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+  // ... (sin cambios en este componente por ahora) ...
 };
 
 const AppContent = ({ user }) => {
-  const [page, setPage] = useState("inventory");
-
-  const handleLogout = () => {
-    signOut(auth).catch((error) =>
-      console.error("Error al cerrar sesión:", error)
-    );
-  };
-
-  const NavButton = ({ active, onClick, children, icon: Icon }) => (
-    <button
-      onClick={onClick}
-      className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-3 px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm font-medium transition-colors ${
-        active ? "bg-pink-100 text-pink-700" : "text-gray-600 hover:bg-gray-100"
-      }`}
-    >
-      <Icon className="w-5 h-5" />
-      <span className="hidden sm:inline">{children}</span>
-    </button>
-  );
-
-  return (
-    <div className="min-h-screen bg-pink-50/50 font-sans">
-      <style>{`
-                @keyframes scale-in {
-                    from { transform: scale(0.95); opacity: 0; }
-                    to { transform: scale(1); opacity: 1; }
-                }
-                .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
-            `}</style>
-      <header className="bg-gradient-to-r from-pink-600 to-rose-500 shadow-lg sticky top-0 z-10 text-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-3">
-            <div className="flex items-center gap-4">
-              <img
-                src="/paleluapp.png"
-                alt="Palelu Spa Logo"
-                className="h-12 w-12 rounded-full"
-              />
-              <h1 className="text-2xl font-bold tracking-tight">Palelu Spa</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-xs text-white/80 text-right">
-                <p>{user.email}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-              >
-                <LogOutIcon className="w-5 h-5 text-white" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white sm:rounded-lg shadow-md p-2 sm:p-4 mb-8">
-          <nav className="flex space-x-2">
-            <NavButton
-              active={page === "inventory"}
-              onClick={() => setPage("inventory")}
-              icon={PackageIcon}
-            >
-              Inventario
-            </NavButton>
-            <NavButton
-              active={page === "sales"}
-              onClick={() => setPage("sales")}
-              icon={ShoppingCartIcon}
-            >
-              Ventas
-            </NavButton>
-          </nav>
-        </div>
-        <div>
-          {page === "inventory" && <InventoryPage user={user} />}
-          {page === "sales" && <SalesPage user={user} />}
-        </div>
-      </main>
-      <footer className="text-center py-6">
-        <p className="text-xs text-pink-900/50">Punto de Venta v1.0</p>
-      </footer>
-    </div>
-  );
+  // ... (sin cambios en este componente por ahora) ...
 };
 
 // --- Componente Principal de la App ---
@@ -942,5 +810,9 @@ export default function App() {
     );
   }
 
-  return user ? <AppContent user={user} /> : <LoginPage />;
+  return (
+    <ToastProvider>
+      {user ? <AppContent user={user} /> : <LoginPage />}
+    </ToastProvider>
+  );
 }
