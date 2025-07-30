@@ -926,6 +926,18 @@ const SalesForm = ({ userId, products, onClose }) => {
   );
 };
 
+const StatCard = ({ title, value, icon: Icon }) => (
+  <div className="bg-white p-6 rounded-lg shadow-md flex items-center">
+    <div className="bg-pink-100 p-3 rounded-full mr-4">
+      <Icon className="w-6 h-6 text-pink-600" />
+    </div>
+    <div>
+      <p className="text-sm font-medium text-gray-500">{title}</p>
+      <p className="text-2xl font-bold text-gray-800">{value}</p>
+    </div>
+  </div>
+);
+
 const SalesPage = ({ user }) => {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
