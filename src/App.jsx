@@ -176,6 +176,24 @@ const LogOutIcon = (props) => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );
+const ImageIcon = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+    <circle cx="9" cy="9" r="2" />
+    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+  </svg>
+);
 const CheckCircleIcon = (props) => (
   <svg
     {...props}
@@ -231,7 +249,7 @@ const ToastProvider = ({ children }) => {
   const [toast, setToast] = useState(null);
 
   const showToast = (message, type = "success") => {
-    setToast({ message, type });
+    setToast({ id: Date.now(), message, type });
     setTimeout(() => {
       setToast(null);
     }, 3000);
@@ -242,6 +260,7 @@ const ToastProvider = ({ children }) => {
       {children}
       {toast && (
         <Toast
+          key={toast.id}
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
@@ -260,7 +279,7 @@ const Toast = ({ message, type, onClose }) => {
 
   return (
     <div
-      className={`fixed top-5 right-5 flex items-center p-4 rounded-lg shadow-lg text-white ${bgColor} z-50 animate-fade-in-down`}
+      className={`fixed top-5 right-5 flex items-center p-4 rounded-lg shadow-lg text-white ${bgColor} z-[100] animate-fade-in-down`}
     >
       <Icon className="w-6 h-6 mr-3" />
       <span>{message}</span>
@@ -276,7 +295,23 @@ const Toast = ({ message, type, onClose }) => {
 
 // --- Componentes de la UI ---
 const Modal = ({ isOpen, onClose, title, children }) => {
-  // ... (sin cambios)
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg m-4 max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center p-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800"
+          >
+            <XIcon className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-2 md:p-4 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
 };
 
 const ProductForm = ({ onClose, userId, productToEdit }) => {
@@ -284,7 +319,8 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [category, setCategory] = useState("Bebestible");
+  const [category, setCategory] = useState("🥤 Bebestible");
+  const [imageUrl, setImageUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isEditing = !!productToEdit;
   const categories = [
@@ -304,7 +340,8 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
       setName(productToEdit.name);
       setPrice(productToEdit.price.toString());
       setStock(productToEdit.stock.toString());
-      setCategory(productToEdit.category || "Otro");
+      setCategory(productToEdit.category || "🍪 Otro");
+      setImageUrl(productToEdit.imageUrl || "");
     }
   }, [isEditing, productToEdit]);
 
@@ -321,6 +358,7 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
         price: parseFloat(price),
         stock: parseInt(stock, 10),
         category,
+        imageUrl: imageUrl.trim(),
       };
       const collectionPath = `artifacts/${appId}/public/data/products`;
       if (isEditing) {
@@ -358,6 +396,22 @@ const ProductForm = ({ onClose, userId, productToEdit }) => {
           onChange={(e) => setName(e.target.value)}
           className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
           required
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="product-image"
+          className="block text-sm font-medium text-gray-700"
+        >
+          🖼️ URL de la Imagen (Opcional)
+        </label>
+        <input
+          id="product-image"
+          type="text"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="https://ejemplo.com/imagen.jpg"
+          className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
         />
       </div>
       <div>
@@ -555,8 +609,22 @@ const InventoryPage = ({ user }) => {
                           index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
                         } hover:bg-pink-50/50`}
                       >
-                        <td className="px-6 py-4 font-medium text-gray-900">
-                          {product.name}
+                        <td className="px-6 py-3 flex items-center gap-4">
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="h-10 w-10 rounded-md object-cover"
+                              onError={(e) => (e.target.style.display = "none")}
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-md bg-gray-100 flex items-center justify-center">
+                              <ImageIcon className="w-5 h-5 text-gray-400" />
+                            </div>
+                          )}
+                          <span className="font-medium text-gray-900">
+                            {product.name}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-gray-600">
                           ${product.price.toFixed(2)}
@@ -692,26 +760,44 @@ const SalesForm = ({ userId, products, onClose }) => {
               <h3 className="font-bold text-pink-700 mb-2 sticky top-0 bg-white/80 backdrop-blur-sm py-1">
                 {category}
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {groupedProducts[category].map((product) => (
                   <button
                     key={product.id}
                     onClick={() => addToCart(product)}
                     disabled={product.stock === 0}
-                    className="p-2 text-center bg-white rounded-lg shadow-sm border border-gray-200 hover:border-pink-500 hover:bg-pink-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="relative p-2 text-center bg-white rounded-lg shadow-sm border-2 border-transparent focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500 hover:border-pink-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all aspect-square flex flex-col justify-center items-center"
                   >
-                    <span className="font-semibold text-sm text-gray-800">
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-16 h-16 object-contain mb-2"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src =
+                            "https://placehold.co/100x100/f9a8d4/4c1d95?text=Error";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-16 h-16 mb-2 flex items-center justify-center">
+                        <ImageIcon className="w-10 h-10 text-gray-300" />
+                      </div>
+                    )}
+                    <span className="font-semibold text-sm text-gray-800 leading-tight">
                       {product.name}
                     </span>
                     <span className="block text-xs text-gray-500">
                       ${product.price.toFixed(2)}
                     </span>
                     <span
-                      className={`block text-xs font-bold ${
-                        product.stock <= 5 ? "text-red-500" : "text-green-600"
+                      className={`absolute top-1 right-1 text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                        product.stock <= 5
+                          ? "bg-red-100 text-red-600"
+                          : "bg-green-100 text-green-600"
                       }`}
                     >
-                      Stock: {product.stock}
+                      {product.stock}
                     </span>
                   </button>
                 ))}
@@ -774,15 +860,15 @@ const SalesForm = ({ userId, products, onClose }) => {
 };
 
 const SalesPage = ({ user }) => {
-  // ... (sin cambios en este componente por ahora) ...
+  // ... (código sin cambios)
 };
 
 const LoginPage = () => {
-  // ... (sin cambios en este componente por ahora) ...
+  // ... (código sin cambios)
 };
 
 const AppContent = ({ user }) => {
-  // ... (sin cambios en este componente por ahora) ...
+  // ... (código sin cambios)
 };
 
 // --- Componente Principal de la App ---
