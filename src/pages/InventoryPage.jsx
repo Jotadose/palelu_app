@@ -17,6 +17,9 @@ import {
   EditIcon,
   Trash2Icon,
   ImageIcon,
+  CameraIcon,
+  UploadIcon,
+  XIcon,
 } from "../components/Icons";
 
 const ProductForm = ({ onClose, appId, db, productToEdit }) => {
@@ -26,7 +29,11 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState("🥤 Bebestible");
   const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const fileInputRef = React.useRef(null);
+  const cameraInputRef = React.useRef(null);
   const isEditing = !!productToEdit;
 
   const categories = [
@@ -48,8 +55,78 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
       setStock(productToEdit.stock.toString());
       setCategory(productToEdit.category || "🍪 Otro");
       setImageUrl(productToEdit.imageUrl || "");
+      setImagePreview(productToEdit.imageUrl || "");
     }
   }, [isEditing, productToEdit]);
+
+  // Función para convertir imagen a Base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Función para comprimir imagen
+  const compressImage = (base64, maxWidth = 400, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = maxWidth / img.width;
+        canvas.width = maxWidth;
+        canvas.height = img.height * ratio;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+    });
+  };
+
+  // Manejar captura de imagen (cámara o galería)
+  const handleImageCapture = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Verificar que sea una imagen
+    if (!file.type.startsWith('image/')) {
+      showToast("Por favor selecciona una imagen válida", "error");
+      return;
+    }
+
+    // Verificar tamaño (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("La imagen es muy grande (máx 5MB)", "error");
+      return;
+    }
+
+    setIsCapturing(true);
+    try {
+      const base64 = await convertToBase64(file);
+      const compressed = await compressImage(base64);
+      setImagePreview(compressed);
+      setImageUrl(compressed); // Guardaremos el base64 como URL
+      showToast("Imagen capturada ✓");
+    } catch (error) {
+      console.error("Error procesando imagen:", error);
+      showToast("Error al procesar la imagen", "error");
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  // Limpiar imagen
+  const clearImage = () => {
+    setImageUrl("");
+    setImagePreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -102,19 +179,105 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
           autoComplete="off"
         />
       </div>
+
+      {/* Sección de imagen con cámara */}
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          🖼️ URL de la Imagen (Opcional)
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          📸 Imagen del Producto
         </label>
+        
+        {/* Preview de imagen */}
+        {imagePreview ? (
+          <div className="relative mb-3">
+            <img
+              src={imagePreview}
+              alt="Preview"
+              className="w-full h-40 object-contain bg-gray-100 rounded-xl border-2 border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={clearImage}
+              className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg active:bg-red-600"
+            >
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="w-full h-32 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center mb-3">
+            <div className="text-center text-gray-400">
+              <ImageIcon className="w-10 h-10 mx-auto mb-1" />
+              <span className="text-xs">Sin imagen</span>
+            </div>
+          </div>
+        )}
+
+        {/* Botones de captura */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Botón Cámara */}
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={isCapturing}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-pink-100 text-pink-700 rounded-xl font-medium active:bg-pink-200 disabled:opacity-50 touch-target"
+          >
+            <CameraIcon className="w-5 h-5" />
+            <span className="text-sm">Cámara</span>
+          </button>
+          
+          {/* Botón Galería */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isCapturing}
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-xl font-medium active:bg-blue-200 disabled:opacity-50 touch-target"
+          >
+            <UploadIcon className="w-5 h-5" />
+            <span className="text-sm">Galería</span>
+          </button>
+        </div>
+
+        {/* Inputs ocultos */}
         <input
-          type="text"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="https://ejemplo.com/imagen.jpg"
-          className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 touch-target"
-          autoComplete="off"
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleImageCapture}
+          className="hidden"
         />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageCapture}
+          className="hidden"
+        />
+
+        {/* Loading de captura */}
+        {isCapturing && (
+          <div className="mt-2 text-center text-sm text-gray-500">
+            <span className="animate-pulse">Procesando imagen...</span>
+          </div>
+        )}
+
+        {/* Input URL alternativo (colapsado) */}
+        <details className="mt-3">
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+            O pegar URL de imagen...
+          </summary>
+          <input
+            type="text"
+            value={imageUrl.startsWith('data:') ? '' : imageUrl}
+            onChange={(e) => {
+              setImageUrl(e.target.value);
+              setImagePreview(e.target.value);
+            }}
+            placeholder="https://ejemplo.com/imagen.jpg"
+            className="mt-2 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+          />
+        </details>
       </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700">
           🗃️ Categoría
