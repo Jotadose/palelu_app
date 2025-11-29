@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  Timestamp,
 } from "firebase/firestore";
 import { useToast } from "../contexts/ToastContext";
 import { Modal } from "../components/UI";
@@ -20,7 +21,179 @@ import {
   CameraIcon,
   UploadIcon,
   XIcon,
+  TrendingDownIcon,
 } from "../components/Icons";
+
+// Modal de Merma de Producto
+const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
+  const { showToast } = useToast();
+  const [quantity, setQuantity] = useState(1);
+  const [reason, setReason] = useState("vencido");
+  const [notes, setNotes] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const reasons = [
+    { id: "vencido", label: "📅 Vencido", description: "Producto expirado" },
+    { id: "roto", label: "💔 Roto/Dañado", description: "Embalaje dañado" },
+    { id: "muestra", label: "🎁 Muestra/Regalo", description: "Entregado sin cobro" },
+    { id: "consumo", label: "🍽️ Consumo interno", description: "Usado en el negocio" },
+    { id: "ajuste", label: "🔢 Ajuste inventario", description: "Diferencia en conteo" },
+    { id: "otro", label: "❓ Otro", description: "Especificar en notas" },
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!product || quantity < 1 || quantity > product.stock) return;
+
+    setIsLoading(true);
+    try {
+      // Registrar movimiento de merma
+      const movementData = {
+        productId: product.id,
+        productName: product.name,
+        type: "merma",
+        quantity: -quantity,
+        reason,
+        notes: notes.trim(),
+        previousStock: product.stock,
+        newStock: product.stock - quantity,
+        createdAt: Timestamp.now(),
+      };
+
+      await addDoc(
+        collection(db, `artifacts/${appId}/public/data/inventory_movements`),
+        movementData
+      );
+
+      // Actualizar stock del producto
+      await updateDoc(
+        doc(db, `artifacts/${appId}/public/data/products`, product.id),
+        { stock: product.stock - quantity }
+      );
+
+      showToast(`Merma registrada: -${quantity} ${product.name}`);
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      console.error("Error registrando merma:", error);
+      showToast("Error al registrar merma", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!product) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="📉 Registrar Merma" fullScreenMobile>
+      <form onSubmit={handleSubmit} className="space-y-4 p-2 sm:p-4">
+        {/* Info del producto */}
+        <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
+          {product.imageUrl ? (
+            <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-lg object-cover" />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-gray-200 flex items-center justify-center">
+              <ImageIcon className="w-6 h-6 text-gray-400" />
+            </div>
+          )}
+          <div>
+            <p className="font-bold text-gray-800">{product.name}</p>
+            <p className="text-sm text-gray-600">Stock actual: <span className="font-semibold text-green-600">{product.stock} unidades</span></p>
+          </div>
+        </div>
+
+        {/* Cantidad */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Cantidad a dar de baja
+          </label>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              className="p-3 bg-gray-100 rounded-xl active:bg-gray-200 touch-target"
+            >
+              <span className="text-xl font-bold">−</span>
+            </button>
+            <input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(Math.min(product.stock, Math.max(1, parseInt(e.target.value) || 1)))}
+              min="1"
+              max={product.stock}
+              className="flex-1 text-center text-2xl font-bold py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
+              className="p-3 bg-gray-100 rounded-xl active:bg-gray-200 touch-target"
+            >
+              <span className="text-xl font-bold">+</span>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1 text-center">
+            Nuevo stock: <span className="font-semibold text-red-600">{product.stock - quantity}</span> unidades
+          </p>
+        </div>
+
+        {/* Razón */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Razón de la merma
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {reasons.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => setReason(r.id)}
+                className={`p-3 text-left rounded-xl border-2 transition-all ${
+                  reason === r.id
+                    ? "border-red-500 bg-red-50"
+                    : "border-gray-200 bg-white active:bg-gray-50"
+                }`}
+              >
+                <span className="font-medium text-sm">{r.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Notas */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Notas (opcional)
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Ej: Venció el 28/11..."
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 touch-target"
+          />
+        </div>
+
+        {/* Botones */}
+        <div className="flex gap-3 pt-4 pb-safe">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-3 text-base font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl active:bg-gray-200 touch-target"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading || quantity < 1}
+            className="flex-1 px-4 py-3 text-base font-medium text-white bg-red-600 rounded-xl shadow-sm active:bg-red-700 disabled:bg-red-300 touch-target"
+          >
+            {isLoading ? "Registrando..." : "Confirmar Merma"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
 
 const ProductForm = ({ onClose, appId, db, productToEdit }) => {
   const { showToast } = useToast();
@@ -354,6 +527,13 @@ export const InventoryPage = ({ app, appId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [mermaModalOpen, setMermaModalOpen] = useState(false);
+  const [productForMerma, setProductForMerma] = useState(null);
+
+  const openMermaModal = (product) => {
+    setProductForMerma(product);
+    setMermaModalOpen(true);
+  };
 
   useEffect(() => {
     const q = query(collection(db, `artifacts/${appId}/public/data/products`));
@@ -430,6 +610,15 @@ export const InventoryPage = ({ app, appId }) => {
           productToEdit={productToEdit}
         />
       </Modal>
+
+      <MermaModal
+        isOpen={mermaModalOpen}
+        onClose={() => setMermaModalOpen(false)}
+        product={productForMerma}
+        appId={appId}
+        db={db}
+        onSuccess={() => setProductForMerma(null)}
+      />
 
       {/* Header - Optimizado para móvil */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
@@ -527,6 +716,13 @@ export const InventoryPage = ({ app, appId }) => {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
+                        onClick={() => openMermaModal(product)}
+                        className="p-3 text-gray-500 active:text-orange-600 active:bg-orange-100 rounded-full touch-target"
+                        title="Registrar merma"
+                      >
+                        <TrendingDownIcon className="w-5 h-5" />
+                      </button>
+                      <button
                         onClick={() => openEditModal(product)}
                         className="p-3 text-gray-500 active:text-pink-600 active:bg-pink-100 rounded-full touch-target"
                       >
@@ -584,8 +780,15 @@ export const InventoryPage = ({ app, appId }) => {
                           {product.stock}{" "}
                           <span className="text-xs text-gray-400">unid.</span>
                         </td>
-                        <td className="px-4 lg:px-6 py-4 w-28">
+                        <td className="px-4 lg:px-6 py-4 w-36">
                           <div className="flex justify-end items-center gap-1">
+                            <button
+                              onClick={() => openMermaModal(product)}
+                              className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-100 rounded-full transition-colors"
+                              title="Registrar merma"
+                            >
+                              <TrendingDownIcon className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => openEditModal(product)}
                               className="p-2 text-gray-500 hover:text-pink-600 hover:bg-pink-100 rounded-full transition-colors"

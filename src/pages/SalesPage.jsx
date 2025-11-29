@@ -29,6 +29,7 @@ import {
   MinusIcon,
   PlusIcon,
   SearchIcon,
+  CoinsIcon,
 } from "../components/Icons";
 
 // Componente de Ticket/Confirmación de Venta
@@ -88,6 +89,19 @@ const SaleConfirmation = ({ order, onClose, onNewSale }) => {
             <span>Método de pago</span>
             <span>{paymentMethodLabels[order.paymentMethod] || order.paymentMethod}</span>
           </div>
+          {/* Mostrar info de efectivo si aplica */}
+          {order.paymentMethod === "efectivo" && order.cashReceived && (
+            <>
+              <div className="flex justify-between text-sm text-gray-600 mt-1">
+                <span>Efectivo recibido</span>
+                <span>${order.cashReceived?.toLocaleString("es-CL")}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-green-600 mt-1">
+                <span>🪙 Vuelto</span>
+                <span>${order.changeGiven?.toLocaleString("es-CL")}</span>
+              </div>
+            </>
+          )}
         </div>
 
         {order.notes && (
@@ -112,6 +126,146 @@ const SaleConfirmation = ({ order, onClose, onNewSale }) => {
         </Button>
       </div>
     </div>
+  );
+};
+
+// Modal de Calculadora de Vuelto para pago en efectivo
+const CashPaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
+  const [cashReceived, setCashReceived] = useState("");
+  
+  const denominations = [1000, 2000, 5000, 10000, 20000, 50000];
+  const change = cashReceived ? parseInt(cashReceived) - total : 0;
+  const isValid = cashReceived && parseInt(cashReceived) >= total;
+  
+  const handleDenomination = (amount) => {
+    setCashReceived(amount.toString());
+  };
+  
+  const handleExact = () => {
+    setCashReceived(total.toString());
+  };
+  
+  const handleConfirm = () => {
+    if (isValid) {
+      onConfirm({
+        cashReceived: parseInt(cashReceived),
+        change: change,
+      });
+    }
+  };
+
+  // Reset cuando se abre el modal
+  useEffect(() => {
+    if (isOpen) {
+      setCashReceived("");
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="💵 Pago en Efectivo" fullScreenMobile>
+      <div className="space-y-5 p-2 sm:p-4">
+        {/* Total a pagar */}
+        <div className="bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl p-5 text-center text-white shadow-lg">
+          <p className="text-sm opacity-90 mb-1">Total a pagar</p>
+          <p className="text-4xl font-bold">${total.toLocaleString("es-CL")}</p>
+        </div>
+
+        {/* Input de efectivo recibido */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Efectivo recibido
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-gray-400">$</span>
+            <input
+              type="number"
+              value={cashReceived}
+              onChange={(e) => setCashReceived(e.target.value)}
+              placeholder="0"
+              inputMode="numeric"
+              className="w-full pl-10 pr-4 py-4 text-3xl font-bold text-center border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 touch-target"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        {/* Botones de denominaciones rápidas */}
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-2">Billetes rápidos</p>
+          <div className="grid grid-cols-3 gap-2">
+            {denominations.map((amount) => (
+              <button
+                key={amount}
+                type="button"
+                onClick={() => handleDenomination(amount)}
+                className={`py-3 px-2 rounded-xl font-semibold text-sm transition-all touch-target ${
+                  parseInt(cashReceived) === amount
+                    ? "bg-green-500 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 active:bg-gray-200"
+                }`}
+              >
+                ${amount.toLocaleString("es-CL")}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleExact}
+            className={`w-full mt-2 py-3 rounded-xl font-semibold text-sm transition-all touch-target ${
+              parseInt(cashReceived) === total
+                ? "bg-blue-500 text-white shadow-md"
+                : "bg-blue-100 text-blue-700 active:bg-blue-200"
+            }`}
+          >
+            💯 Monto Exacto (${total.toLocaleString("es-CL")})
+          </button>
+        </div>
+
+        {/* Vuelto calculado */}
+        <div className={`rounded-2xl p-4 text-center transition-all ${
+          !cashReceived 
+            ? "bg-gray-100" 
+            : change >= 0 
+              ? "bg-green-100 border-2 border-green-400" 
+              : "bg-red-100 border-2 border-red-400"
+        }`}>
+          <p className="text-sm font-medium text-gray-600 mb-1">
+            {change >= 0 ? "🪙 Vuelto a entregar" : "⚠️ Falta dinero"}
+          </p>
+          <p className={`text-3xl font-bold ${
+            !cashReceived 
+              ? "text-gray-400" 
+              : change >= 0 
+                ? "text-green-600" 
+                : "text-red-600"
+          }`}>
+            ${Math.abs(change).toLocaleString("es-CL")}
+          </p>
+        </div>
+
+        {/* Botones de acción */}
+        <div className="flex gap-3 pt-2 pb-safe">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-3 text-base font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl active:bg-gray-200 touch-target"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!isValid}
+            className="flex-1 px-4 py-3 text-base font-medium text-white bg-green-600 rounded-xl shadow-sm active:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 touch-target flex items-center justify-center gap-2"
+          >
+            <CoinsIcon className="w-5 h-5" />
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 };
 
@@ -163,6 +317,8 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
   const [notes, setNotes] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isCartExpanded, setIsCartExpanded] = useState(false); // Para móvil
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [cashPaymentData, setCashPaymentData] = useState(null); // { cashReceived, change }
 
   const addToCart = (product) => {
     setCart((prevCart) => {
@@ -217,7 +373,27 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
     [cart]
   );
 
-  const handleSubmitSale = async () => {
+  // Función para iniciar el proceso de venta
+  const initiateSubmitSale = () => {
+    if (Object.keys(cart).length === 0) return;
+    
+    // Si es efectivo, mostrar modal de calculadora de vuelto
+    if (paymentMethod === "efectivo") {
+      setShowCashModal(true);
+    } else {
+      // Para otros métodos, procesar directamente
+      handleSubmitSale(null);
+    }
+  };
+
+  // Callback cuando se confirma pago en efectivo
+  const handleCashPaymentConfirm = (data) => {
+    setCashPaymentData(data);
+    setShowCashModal(false);
+    handleSubmitSale(data);
+  };
+
+  const handleSubmitSale = async (cashData = null) => {
     if (Object.keys(cart).length === 0) return;
     setIsLoading(true);
 
@@ -249,6 +425,11 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
         sessionId: sessionId || null,
         status: "completed",
         createdAt: Timestamp.now(),
+        // Agregar info de pago en efectivo si aplica
+        ...(paymentMethod === "efectivo" && cashData && {
+          cashReceived: cashData.cashReceived,
+          changeGiven: cashData.change,
+        }),
       };
 
       const orderRef = doc(collection(db, ordersPath));
@@ -495,7 +676,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
                 <span className="text-green-600">${total.toLocaleString("es-CL")}</span>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); handleSubmitSale(); }}
+                onClick={(e) => { e.stopPropagation(); initiateSubmitSale(); }}
                 disabled={isLoading || Object.keys(cart).length === 0}
                 className="w-full mt-3 sm:mt-4 py-4 sm:py-3 text-white text-lg font-bold bg-green-600 rounded-xl shadow-lg active:bg-green-700 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-target"
               >
@@ -518,6 +699,14 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
           </div>
         </div>
       </div>
+
+      {/* Modal de pago en efectivo */}
+      <CashPaymentModal
+        isOpen={showCashModal}
+        onClose={() => setShowCashModal(false)}
+        total={total}
+        onConfirm={handleCashPaymentConfirm}
+      />
     </div>
   );
 };
