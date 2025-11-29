@@ -1,3 +1,204 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   OPTIMIZACIONES MÓVIL / ANDROID
+   ============================================ */
+
+/* Prevenir comportamientos no deseados en móvil */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Smooth scrolling nativo */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevenir pull-to-refresh y overscroll */
+body {
+  overscroll-behavior-y: contain;
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Safe area para notch/nav bar */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Mejorar touch targets - mínimo 44px para accesibilidad */
+@layer components {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  .touch-target-lg {
+    @apply min-h-[56px] min-w-[56px];
+  }
+}
+
+/* Botones optimizados para touch */
+button, 
+[role="button"],
+a,
+input[type="button"],
+input[type="submit"] {
+  touch-action: manipulation;
+}
+
+/* Inputs más grandes en móvil */
+input, 
+select, 
+textarea {
+  font-size: 16px !important; /* Previene zoom en iOS */
+}
+
+/* Active states más visibles para touch */
+@media (hover: none) {
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+}
+
+/* Scrollbar oculto pero funcional en móvil */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Animación de entrada suave */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.2s ease-out;
+}
+
+.animate-fade-in-down {
+  animation: fade-in-down 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.15s ease-out;
+}
+
+/* Haptic feedback visual */
+.haptic-feedback:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+/* Bottom navigation bar styles */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Main content con espacio para bottom nav */
+.main-with-bottom-nav {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+/* Grid optimizado para móvil */
+@media (max-width: 640px) {
+  .mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .mobile-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Cards con sombra suave para móvil */
+.card-mobile {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100;
+}
+
+/* Typography responsive */
+@media (max-width: 640px) {
+  .text-responsive-xl {
+    font-size: 1.25rem;
+  }
+  
+  .text-responsive-2xl {
+    font-size: 1.5rem;
+  }
+}
+
+/* Loading spinner optimizado */
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Skeleton loading */
+.skeleton {
+  @apply bg-gray-200 animate-pulse rounded;
+}
+
+/* Focus visible solo con teclado */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-primary;
+}

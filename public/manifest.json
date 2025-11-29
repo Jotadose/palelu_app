@@ -1,0 +1,26 @@
+{
+  "name": "Palelu POS",
+  "short_name": "Palelu",
+  "description": "Punto de Venta Palelu Spa - Venta rápida en eventos",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7FAFC",
+  "theme_color": "#5D3A9B",
+  "icons": [
+    {
+      "src": "/paleluapp.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/paleluapp.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance"],
+  "lang": "es"
+}
