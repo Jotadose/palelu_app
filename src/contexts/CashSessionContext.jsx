@@ -4,7 +4,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   limit,
   onSnapshot,
   addDoc,
@@ -38,25 +37,31 @@ export const CashSessionProvider = ({ children, app, appId, userId }) => {
   useEffect(() => {
     if (!userId) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // Query simplificada - solo filtra por status "open"
+    // No necesita índice compuesto ya que solo usa un campo
     const q = query(
       collection(db, sessionsPath),
       where("status", "==", "open"),
-      orderBy("openedAt", "desc"),
       limit(1)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const sessionDoc = snapshot.docs[0];
-        setCurrentSession({ id: sessionDoc.id, ...sessionDoc.data() });
-      } else {
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const sessionDoc = snapshot.docs[0];
+          setCurrentSession({ id: sessionDoc.id, ...sessionDoc.data() });
+        } else {
+          setCurrentSession(null);
+        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Error escuchando sesión de caja:", error);
         setCurrentSession(null);
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, [db, sessionsPath, userId]);
@@ -68,19 +73,34 @@ export const CashSessionProvider = ({ children, app, appId, userId }) => {
       return;
     }
 
+    // Query sin orderBy para evitar índice compuesto
+    // Ordenamos en el cliente
     const q = query(
       collection(db, ordersPath),
-      where("sessionId", "==", currentSession.id),
-      orderBy("createdAt", "desc")
+      where("sessionId", "==", currentSession.id)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setTodayOrders(orders);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const orders = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .sort((a, b) => {
+            // Ordenar por createdAt descendente en el cliente
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB - dateA;
+          });
+        setTodayOrders(orders);
+      },
+      (error) => {
+        console.error("Error escuchando órdenes:", error);
+        setTodayOrders([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [db, ordersPath, currentSession]);
@@ -92,19 +112,34 @@ export const CashSessionProvider = ({ children, app, appId, userId }) => {
       return;
     }
 
+    // Query sin orderBy para evitar índice compuesto
+    // Ordenamos en el cliente
     const q = query(
       collection(db, movementsPath),
-      where("sessionId", "==", currentSession.id),
-      orderBy("createdAt", "desc")
+      where("sessionId", "==", currentSession.id)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const movements = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCashMovements(movements);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const movements = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          .sort((a, b) => {
+            // Ordenar por createdAt descendente en el cliente
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB - dateA;
+          });
+        setCashMovements(movements);
+      },
+      (error) => {
+        console.error("Error escuchando movimientos:", error);
+        setCashMovements([]);
+      }
+    );
 
     return () => unsubscribe();
   }, [db, movementsPath, currentSession]);
