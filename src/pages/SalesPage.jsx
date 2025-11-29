@@ -162,6 +162,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [notes, setNotes] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCartExpanded, setIsCartExpanded] = useState(false); // Para móvil
 
   const addToCart = (product) => {
     setCart((prevCart) => {
@@ -361,122 +362,165 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
                 </button>
               ))}
             </div>
-          </div>
         ))}
       </div>
 
-      {/* Carrito - Optimizado para móvil */}
-      <div className="w-full lg:w-2/5 p-3 sm:p-4 bg-gray-50 flex flex-col min-h-[40vh] lg:min-h-0">
-        <h3 className="text-lg sm:text-xl font-bold mb-3 text-text-primary flex items-center gap-2">
-          🛒 <span>Pedido</span>
-          {Object.keys(cart).length > 0 && (
-            <span className="bg-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full">
-              {Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)}
-            </span>
-          )}
-        </h3>
-
-        <div className="flex-grow overflow-y-auto -mr-2 pr-2 min-h-[100px] max-h-[30vh] lg:max-h-none">
-          {Object.keys(cart).length === 0 ? (
-            <p className="text-text-secondary text-center mt-6 text-sm">
-              Toca productos para agregarlos
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {Object.values(cart).map((item) => (
-                <li
-                  key={item.id}
-                  className="flex justify-between items-center bg-white p-2 sm:p-3 rounded-xl shadow-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate">{item.name}</p>
-                    <p className="text-xs text-text-secondary">
-                      ${item.price.toLocaleString("es-CL")} c/u
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <div className="flex items-center bg-gray-100 rounded-xl">
-                      <button
-                        onClick={() => updateQuantity(item.id, -1)}
-                        className="p-2.5 sm:p-2 active:bg-gray-300 rounded-l-xl touch-target"
-                      >
-                        <MinusIcon className="w-4 h-4" />
-                      </button>
-                      <span className="px-3 sm:px-4 font-bold text-sm min-w-[40px] text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateQuantity(item.id, 1)}
-                        className="p-2.5 sm:p-2 active:bg-gray-300 rounded-r-xl touch-target"
-                      >
-                        <PlusIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="font-bold text-xs sm:text-sm text-primary w-16 sm:w-20 text-right">
-                      ${(item.price * item.quantity).toLocaleString("es-CL")}
-                    </p>
-                    <button
-                      onClick={() => removeFromCart(item.id)}
-                      className="p-2.5 sm:p-2 text-red-500 active:bg-red-100 rounded-full touch-target"
-                    >
-                      <Trash2Icon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Notas del pedido */}
-        <div className="mt-2 sm:mt-3">
-          <input
-            type="text"
-            placeholder="Notas (ej: sin mayo, para llevar...)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
-            autoComplete="off"
-          />
-        </div>
-
-        {/* Método de pago */}
-        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-          <p className="text-sm font-medium text-gray-700 mb-2">Método de pago:</p>
-          <PaymentMethodSelector
-            selected={paymentMethod}
-            onChange={setPaymentMethod}
-          />
-        </div>
-
-        {/* Total y botón de pago - Optimizado para touch */}
-        <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4 pb-safe">
-          <div className="flex justify-between items-center font-bold text-xl sm:text-2xl text-text-primary">
-            <span>Total:</span>
-            <span className="text-green-600">${total.toLocaleString("es-CL")}</span>
-          </div>
-          <button
-            onClick={handleSubmitSale}
-            disabled={isLoading || Object.keys(cart).length === 0}
-            className="w-full mt-3 sm:mt-4 py-4 sm:py-3 text-white text-lg font-bold bg-green-600 rounded-xl shadow-lg active:bg-green-700 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-target"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                </svg>
-                Procesando...
+      {/* Carrito - Colapsable en móvil, fijo en desktop */}
+      <div className={`w-full lg:w-2/5 bg-gray-50 flex flex-col transition-all duration-300 ${
+        isCartExpanded ? 'fixed inset-0 z-50 lg:relative lg:inset-auto' : 'lg:min-h-0'
+      }`}>
+        {/* Header del carrito - tocable para expandir en móvil */}
+        <div 
+          className="p-3 sm:p-4 bg-gray-50 lg:bg-transparent cursor-pointer lg:cursor-default border-t lg:border-t-0"
+          onClick={() => setIsCartExpanded(!isCartExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg sm:text-xl font-bold text-text-primary flex items-center gap-2">
+              🛒 <span>Pedido</span>
+              {Object.keys(cart).length > 0 && (
+                <span className="bg-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)}
+                </span>
+              )}
+            </h3>
+            {/* Mostrar total y flecha en móvil cuando está colapsado */}
+            <div className="flex items-center gap-2 lg:hidden">
+              {Object.keys(cart).length > 0 && !isCartExpanded && (
+                <span className="font-bold text-green-600">${total.toLocaleString("es-CL")}</span>
+              )}
+              <span className={`transition-transform duration-300 ${isCartExpanded ? 'rotate-180' : ''}`}>
+                ▲
               </span>
-            ) : (
-              <>
-                <CheckCircleIcon className="w-6 h-6" />
-                Cobrar ${total.toLocaleString("es-CL")}
-              </>
-            )}
-          </button>
+            </div>
+          </div>
+          
+          {/* Resumen compacto cuando está colapsado en móvil */}
+          {!isCartExpanded && Object.keys(cart).length > 0 && (
+            <div className="lg:hidden mt-2 flex flex-wrap gap-1">
+              {Object.values(cart).slice(0, 3).map((item) => (
+                <span key={item.id} className="text-xs bg-white px-2 py-1 rounded-full border">
+                  {item.quantity}x {item.name.length > 10 ? item.name.slice(0, 10) + '...' : item.name}
+                </span>
+              ))}
+              {Object.keys(cart).length > 3 && (
+                <span className="text-xs bg-secondary/10 text-secondary px-2 py-1 rounded-full">
+                  +{Object.keys(cart).length - 3} más
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Contenido expandible del carrito */}
+        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+          isCartExpanded ? 'max-h-[100vh] opacity-100' : 'max-h-0 lg:max-h-none opacity-0 lg:opacity-100'
+        }`}>
+          <div className="flex-1 p-3 sm:p-4 pt-0 flex flex-col min-h-0">
+            <div className="flex-grow overflow-y-auto -mr-2 pr-2">
+              {Object.keys(cart).length === 0 ? (
+                <p className="text-text-secondary text-center mt-6 text-sm">
+                  Toca productos para agregarlos
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {Object.values(cart).map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex justify-between items-center bg-white p-2 sm:p-3 rounded-xl shadow-sm"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-text-secondary">
+                          ${item.price.toLocaleString("es-CL")} c/u
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <div className="flex items-center bg-gray-100 rounded-xl">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
+                            className="p-2.5 sm:p-2 active:bg-gray-300 rounded-l-xl touch-target"
+                          >
+                            <MinusIcon className="w-4 h-4" />
+                          </button>
+                          <span className="px-3 sm:px-4 font-bold text-sm min-w-[40px] text-center">{item.quantity}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
+                            className="p-2.5 sm:p-2 active:bg-gray-300 rounded-r-xl touch-target"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="font-bold text-xs sm:text-sm text-primary w-16 sm:w-20 text-right">
+                          ${(item.price * item.quantity).toLocaleString("es-CL")}
+                        </p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                          className="p-2.5 sm:p-2 text-red-500 active:bg-red-100 rounded-full touch-target"
+                        >
+                          <Trash2Icon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Notas del pedido */}
+            <div className="mt-2 sm:mt-3">
+              <input
+                type="text"
+                placeholder="Notas (ej: sin mayo, para llevar...)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
+                autoComplete="off"
+              />
+            </div>
+
+            {/* Método de pago */}
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
+              <p className="text-sm font-medium text-gray-700 mb-2">Método de pago:</p>
+              <PaymentMethodSelector
+                selected={paymentMethod}
+                onChange={setPaymentMethod}
+              />
+            </div>
+
+            {/* Total y botón de pago */}
+            <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4 pb-safe">
+              <div className="flex justify-between items-center font-bold text-xl sm:text-2xl text-text-primary">
+                <span>Total:</span>
+                <span className="text-green-600">${total.toLocaleString("es-CL")}</span>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleSubmitSale(); }}
+                disabled={isLoading || Object.keys(cart).length === 0}
+                className="w-full mt-3 sm:mt-4 py-4 sm:py-3 text-white text-lg font-bold bg-green-600 rounded-xl shadow-lg active:bg-green-700 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-target"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Procesando...
+                  </span>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="w-6 h-6" />
+                    Cobrar ${total.toLocaleString("es-CL")}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
+};);
 };
 
 // Página principal de ventas
