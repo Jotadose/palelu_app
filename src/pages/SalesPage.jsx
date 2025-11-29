@@ -290,9 +290,9 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
   }, [filteredProducts]);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[85vh] sm:h-[75vh]">
-      {/* Catálogo de productos */}
-      <div className="w-full lg:w-3/5 p-2 space-y-3 overflow-y-auto border-b lg:border-b-0 lg:border-r flex-1 min-h-0">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] sm:h-[75vh]">
+      {/* Catálogo de productos - ocupa todo menos la barra del carrito en móvil */}
+      <div className="w-full lg:w-3/5 p-2 space-y-3 overflow-y-auto border-b lg:border-b-0 lg:border-r flex-1 min-h-0 pb-24 lg:pb-2">
         {/* Búsqueda - Optimizada para touch */}
         <div className="sticky top-0 bg-white pb-2 z-10">
           <div className="relative">
@@ -366,50 +366,49 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
         ))}
       </div>
 
-      {/* Carrito - Colapsable en móvil, fijo en desktop */}
-      <div className={`w-full lg:w-2/5 bg-gray-50 flex flex-col transition-all duration-300 ${
-        isCartExpanded ? 'fixed inset-0 z-[60] lg:relative lg:inset-auto pt-safe' : 'lg:min-h-0'
+      {/* Carrito - Barra flotante en móvil, sidebar en desktop */}
+      <div className={`lg:w-2/5 bg-gray-50 flex flex-col transition-all duration-300 ${
+        isCartExpanded 
+          ? 'fixed inset-0 z-[60] lg:relative lg:inset-auto' 
+          : 'fixed bottom-14 left-0 right-0 z-[45] lg:relative lg:bottom-auto lg:z-auto shadow-[0_-4px_20px_rgba(0,0,0,0.15)] lg:shadow-none rounded-t-2xl lg:rounded-none'
       }`}>
         {/* Header del carrito - tocable para expandir en móvil */}
         <div 
-          className="p-3 sm:p-4 bg-gray-50 lg:bg-transparent cursor-pointer lg:cursor-default border-t lg:border-t-0"
+          className={`p-3 sm:p-4 bg-gray-50 lg:bg-transparent cursor-pointer lg:cursor-default ${isCartExpanded ? 'border-b' : ''} lg:border-t-0`}
           onClick={() => setIsCartExpanded(!isCartExpanded)}
         >
           <div className="flex items-center justify-between">
-            <h3 className="text-lg sm:text-xl font-bold text-text-primary flex items-center gap-2">
-              🛒 <span>Pedido</span>
+            <h3 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-2">
+              🛒 <span className="hidden sm:inline">Pedido</span>
               {Object.keys(cart).length > 0 && (
                 <span className="bg-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full">
                   {Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
               )}
             </h3>
-            {/* Mostrar total y flecha en móvil cuando está colapsado */}
+            
+            {/* En móvil: mostrar resumen inline y botón de cobrar */}
             <div className="flex items-center gap-2 lg:hidden">
               {Object.keys(cart).length > 0 && !isCartExpanded && (
-                <span className="font-bold text-green-600">${total.toLocaleString("es-CL")}</span>
+                <>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    {Object.values(cart).slice(0, 2).map((item) => (
+                      <span key={item.id} className="bg-white px-1.5 py-0.5 rounded border truncate max-w-[60px]">
+                        {item.quantity}x {item.name.slice(0, 6)}
+                      </span>
+                    ))}
+                    {Object.keys(cart).length > 2 && (
+                      <span className="text-secondary font-medium">+{Object.keys(cart).length - 2}</span>
+                    )}
+                  </div>
+                  <span className="font-bold text-green-600 text-sm">${total.toLocaleString("es-CL")}</span>
+                </>
               )}
-              <span className={`transition-transform duration-300 ${isCartExpanded ? 'rotate-180' : ''}`}>
+              <span className={`transition-transform duration-300 text-gray-400 ${isCartExpanded ? 'rotate-180' : ''}`}>
                 ▲
               </span>
             </div>
           </div>
-          
-          {/* Resumen compacto cuando está colapsado en móvil */}
-          {!isCartExpanded && Object.keys(cart).length > 0 && (
-            <div className="lg:hidden mt-2 flex flex-wrap gap-1">
-              {Object.values(cart).slice(0, 3).map((item) => (
-                <span key={item.id} className="text-xs bg-white px-2 py-1 rounded-full border">
-                  {item.quantity}x {item.name.length > 10 ? item.name.slice(0, 10) + '...' : item.name}
-                </span>
-              ))}
-              {Object.keys(cart).length > 3 && (
-                <span className="text-xs bg-secondary/10 text-secondary px-2 py-1 rounded-full">
-                  +{Object.keys(cart).length - 3} más
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Contenido expandible del carrito */}
