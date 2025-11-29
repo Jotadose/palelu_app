@@ -368,7 +368,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
 
       {/* Carrito - Colapsable en móvil, fijo en desktop */}
       <div className={`w-full lg:w-2/5 bg-gray-50 flex flex-col transition-all duration-300 ${
-        isCartExpanded ? 'fixed inset-0 z-50 lg:relative lg:inset-auto' : 'lg:min-h-0'
+        isCartExpanded ? 'fixed inset-0 z-[60] lg:relative lg:inset-auto pt-safe' : 'lg:min-h-0'
       }`}>
         {/* Header del carrito - tocable para expandir en móvil */}
         <div 
@@ -490,7 +490,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
             </div>
 
             {/* Total y botón de pago */}
-            <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4 pb-safe">
+            <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4 pb-20 sm:pb-4">
               <div className="flex justify-between items-center font-bold text-xl sm:text-2xl text-text-primary">
                 <span>Total:</span>
                 <span className="text-green-600">${total.toLocaleString("es-CL")}</span>
