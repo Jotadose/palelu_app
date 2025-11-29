@@ -362,6 +362,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
                 </button>
               ))}
             </div>
+          </div>
         ))}
       </div>
 
@@ -520,7 +521,6 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
       </div>
     </div>
   );
-};);
 };
 
 // Página principal de ventas
