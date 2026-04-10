@@ -65,7 +65,6 @@ const BottomNavButton = ({ active, onClick, icon: Icon, label, disabled = false 
 // Contenido principal de la app
 const AppContent = () => {
   const { user, logout } = useAuth();
-  const { currentEvent } = useEvent();
   const [page, setPage] = useState("sales");
 
   const handleLogout = () => {
@@ -73,10 +72,143 @@ const AppContent = () => {
   };
 
   return (
+    <div className="min-h-screen bg-background-default font-sans">
+      {/* Header compacto para móvil */}
+      <header className="bg-gradient-to-r from-primary to-primary-light shadow-lg sticky top-0 z-40 text-white safe-area-top">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-2 sm:py-3">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <img
+                src="/paleluapp.png"
+                alt="Palelu Spa Logo"
+                className="h-10 w-10 sm:h-14 sm:w-14 rounded-full border-2 border-white/50"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                }}
+              />
+              <div>
+                <h1 className="text-lg sm:text-2xl font-bold tracking-tight">Palelu</h1>
+                <p className="text-[10px] sm:text-xs text-white/70">Spa para mascotas</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Indicador de evento activo - se muestra desde el provider */}
+              <div className="text-xs text-white/90 text-right hidden md:block">
+                <p>{user?.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 active:scale-95 transition-all touch-target"
+                title="Cerrar sesión"
+              >
+                <LogOutIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content - con padding para bottom nav en móvil */}
+      <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
+        {/* Navigation - solo visible en desktop */}
+        <div className="hidden sm:block bg-white rounded-lg shadow-md p-4 mb-8">
+          <nav className="flex space-x-2">
+            <DesktopNavButton
+              active={page === "sales"}
+              onClick={() => setPage("sales")}
+              icon={ShoppingCartIcon}
+            >
+              Punto de Venta
+            </DesktopNavButton>
+            <DesktopNavButton
+              active={page === "inventory"}
+              onClick={() => setPage("inventory")}
+              icon={PackageIcon}
+            >
+              Inventario
+            </DesktopNavButton>
+            <DesktopNavButton
+              active={page === "events"}
+              onClick={() => setPage("events")}
+              icon={CalendarIcon}
+            >
+              Eventos
+            </DesktopNavButton>
+            <DesktopNavButton
+              active={page === "reports"}
+              onClick={() => setPage("reports")}
+              icon={ChartIcon}
+            >
+              Reportes
+            </DesktopNavButton>
+            <DesktopNavButton
+              active={page === "cash"}
+              onClick={() => setPage("cash")}
+              icon={CashRegisterIcon}
+            >
+              Caja
+            </DesktopNavButton>
+          </nav>
+        </div>
+
+        {/* Page Content */}
+        <div className="animate-fade-in-up">
+          {page === "sales" && <SalesPage app={app} appId={appId} />}
+          {page === "inventory" && <InventoryPage app={app} appId={appId} />}
+          {page === "events" && <EventsPage app={app} appId={appId} />}
+          {page === "reports" && <ReportsPage app={app} appId={appId} />}
+          {page === "cash" && <CashRegisterPage app={app} appId={appId} />}
+        </div>
+      </main>
+
+      {/* Bottom Navigation - solo móvil */}
+      <nav className="sm:hidden bottom-nav bg-white border-t border-gray-200 shadow-lg">
+        <div className="flex items-stretch">
+          <BottomNavButton
+            active={page === "sales"}
+            onClick={() => setPage("sales")}
+            icon={ShoppingCartIcon}
+            label="Venta"
+          />
+          <BottomNavButton
+            active={page === "inventory"}
+            onClick={() => setPage("inventory")}
+            icon={PackageIcon}
+            label="Inventario"
+          />
+          <BottomNavButton
+            active={page === "events"}
+            onClick={() => setPage("events")}
+            icon={CalendarIcon}
+            label="Eventos"
+          />
+          <BottomNavButton
+            active={page === "cash"}
+            onClick={() => setPage("cash")}
+            icon={CashRegisterIcon}
+            label="Caja"
+          />
+        </div>
+      </nav>
+    </div>
+  );
+};
+
+// Componente que usa EventProvider y contiene toda la app
+const AppWithProviders = () => {
+  const { user } = useAuth();
+  const { currentEvent } = useEvent();
+  const [page, setPage] = useState("sales");
+
+  const handleLogout = () => {
+    useAuth().logout();
+  };
+
+  return (
     <EventProvider app={app} appId={appId} userId={user?.uid}>
       <CashSessionProvider app={app} appId={appId} userId={user?.uid}>
         <div className="min-h-screen bg-background-default font-sans">
-          {/* Header compacto para móvil */}
+          {/* Header con indicador de evento */}
           <header className="bg-gradient-to-r from-primary to-primary-light shadow-lg sticky top-0 z-40 text-white safe-area-top">
             <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
               <div className="flex justify-between items-center py-2 sm:py-3">
@@ -95,7 +227,6 @@ const AppContent = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-4">
-                  {/* Indicador de evento activo */}
                   {currentEvent && (
                     <div className="hidden md:flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full text-xs">
                       <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
@@ -117,9 +248,9 @@ const AppContent = () => {
             </div>
           </header>
 
-          {/* Main Content - con padding para bottom nav en móvil */}
+          {/* Main Content */}
           <main className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
-            {/* Navigation - solo visible en desktop */}
+            {/* Navigation - desktop */}
             <div className="hidden sm:block bg-white rounded-lg shadow-md p-4 mb-8">
               <nav className="flex space-x-2">
                 <DesktopNavButton
@@ -170,7 +301,7 @@ const AppContent = () => {
             </div>
           </main>
 
-          {/* Bottom Navigation - solo móvil */}
+          {/* Bottom Navigation - móvil */}
           <nav className="sm:hidden bottom-nav bg-white border-t border-gray-200 shadow-lg">
             <div className="flex items-stretch">
               <BottomNavButton
@@ -238,7 +369,7 @@ const AuthenticatedApp = () => {
     );
   }
 
-  return user ? <AppContent /> : <LoginPage />;
+  return user ? <AppWithProviders /> : <LoginPage />;
 };
 
 // --- Componente Principal de la App ---
