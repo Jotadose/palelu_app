@@ -1,31 +1,21 @@
-// Firebase config con fallback para desarrollo
-// Las variables se cargan desde .env en desarrollo
-// y desde Variables de Entorno en Vercel (Production)
+// Firebase config - las variables se cargan desde Vite.env (desarrollo) o Vercel (producción)
 
-// Valores por defecto para desarrollo local (no se suben a producción)
-const devConfig = {
-  apiKey: "demo-api-key",
-  authDomain: "demo.firebaseapp.com",
-  projectId: "demo-project",
-  storageBucket: "demo.firebasestorage.app",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abc123",
-  measurementId: "G-DEMO123"
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-api-key",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "demo.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "demo.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abc123",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-DEMO123"
 };
 
-// Valores de producción (se configurarán en Vercel)
-const prodConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
-};
+// Debug: mostrar qué config se usa (solo en desarrollo)
+if (import.meta.env.DEV) {
+  console.log("🔧 Firebase Config (dev):", {
+    projectId: firebaseConfig.projectId,
+    hasApiKey: !!firebaseConfig.apiKey
+  });
+}
 
-// Usar config de producción si está disponible, si no usar fallback
-const isProd = import.meta.env.VITE_FIREBASE_PROJECT_ID && 
-               import.meta.env.VITE_FIREBASE_PROJECT_ID !== "demo-project";
-
-export const firebaseConfig = isProd ? prodConfig : devConfig;
+export { firebaseConfig };
