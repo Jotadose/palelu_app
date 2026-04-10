@@ -272,7 +272,7 @@ const CashPaymentModal = ({ isOpen, onClose, total, onConfirm }) => {
   );
 };
 
-// Selector de Medio de Pago - Optimizado para touch
+// Selector de Medio de Pago - Compacto
 const PaymentMethodSelector = ({ selected, onChange }) => {
   const methods = [
     { id: "efectivo", label: "Efectivo", icon: BanknoteIcon, color: "green" },
@@ -281,29 +281,21 @@ const PaymentMethodSelector = ({ selected, onChange }) => {
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-3 gap-1.5">
       {methods.map(({ id, label, icon: Icon, color }) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          className={`p-3 sm:p-3 rounded-xl sm:rounded-lg border-2 transition-all flex flex-col items-center gap-1.5 touch-target active:scale-95 ${
+          className={`p-1.5 sm:p-2 rounded-lg border transition-all flex flex-col items-center gap-0.5 touch-target active:scale-95 ${
             selected === id
-              ? `border-${color}-500 bg-${color}-50 text-${color}-700 shadow-md`
-              : "border-gray-200 hover:border-gray-300 text-gray-600 active:bg-gray-100"
+              ? "border-green-500 bg-green-50 text-green-700"
+              : "border-gray-200 text-gray-600 active:bg-gray-100"
           }`}
-          style={{
-            borderColor: selected === id ? 
-              (color === "green" ? "#22c55e" : color === "blue" ? "#3b82f6" : "#a855f7") : 
-              undefined,
-            backgroundColor: selected === id ? 
-              (color === "green" ? "#f0fdf4" : color === "blue" ? "#eff6ff" : "#faf5ff") : 
-              undefined,
-            minHeight: '64px',
-          }}
+          style={{ minHeight: '40px' }}
         >
-          <Icon className="w-7 h-7 sm:w-6 sm:h-6" />
-          <span className="text-xs font-medium">{label}</span>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-[10px] sm:text-xs font-medium">{label}</span>
         </button>
       ))}
     </div>
@@ -503,10 +495,10 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
   }, [filteredProducts]);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] sm:h-[75vh]">
-      {/* Catálogo de productos - ocupa todo menos la barra del carrito en móvil */}
-      <div className="w-full lg:w-3/5 p-2 space-y-3 overflow-y-auto border-b lg:border-b-0 lg:border-r flex-1 min-h-0 pb-24 lg:pb-2">
-        {/* Búsqueda - Optimizada para touch */}
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] sm:h-[75vh] overflow-hidden">
+      {/* Catálogo de productos */}
+      <div className="w-full lg:w-3/5 p-2 space-y-2 overflow-y-auto border-b lg:border-b-0 lg:border-r flex-1 min-h-0">
+        {/* Búsqueda */}
         <div className="sticky top-0 bg-white pb-2 z-10">
           <div className="relative">
             <input
@@ -514,33 +506,33 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
               placeholder="Buscar producto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
+              className="w-full pl-10 pr-4 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
               autoComplete="off"
               autoCorrect="off"
               spellCheck="false"
             />
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
         </div>
 
         {Object.keys(groupedProducts).sort().map((category) => (
           <div key={category}>
-            <h3 className="font-bold text-primary-dark mb-2 sticky top-14 bg-white/90 backdrop-blur-sm py-2 z-[5] text-sm sm:text-base">
+            <h3 className="font-bold text-primary-dark text-xs sm:text-sm sticky top-10 bg-white/95 backdrop-blur-sm py-1 z-[5]">
               {category}
             </h3>
-            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-1.5 sm:gap-2">
               {groupedProducts[category].map((product) => (
                 <button
                   key={product.id}
                   onClick={() => addToCart(product)}
                   disabled={product.stock === 0}
-                  className="relative p-2 text-center bg-white rounded-xl shadow-sm border-2 border-gray-200 focus:outline-none focus:border-secondary focus:ring-2 focus:ring-secondary active:scale-95 active:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all aspect-square flex flex-col justify-center items-center touch-manipulation"
+                  className="relative p-1.5 sm:p-2 text-center bg-white rounded-lg shadow-sm border border-gray-200 focus:outline-none focus:border-secondary active:scale-95 active:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex flex-col justify-center items-center touch-manipulation"
                 >
                   {product.imageUrl ? (
                     <img
                       src={product.imageUrl}
                       alt={product.name}
-                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain mb-1"
+                      className="w-10 h-10 sm:w-12 sm:h-12 object-contain mb-0.5"
                       onError={(e) => {
                         e.target.onerror = null;
                         e.target.src = "";
@@ -548,18 +540,18 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
                       }}
                     />
                   ) : (
-                    <div className="w-12 h-12 sm:w-14 sm:h-14 mb-1 flex items-center justify-center">
-                      <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8 text-gray-300" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 mb-0.5 flex items-center justify-center">
+                      <ImageIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />
                     </div>
                   )}
-                  <span className="font-semibold text-[10px] sm:text-xs text-text-primary leading-tight line-clamp-2">
+                  <span className="font-medium text-[9px] sm:text-[10px] text-text-primary leading-tight line-clamp-2 w-full">
                     {product.name}
                   </span>
-                  <span className="block text-xs sm:text-sm text-secondary font-bold mt-0.5">
+                  <span className="block text-[10px] sm:text-xs text-secondary font-bold">
                     ${product.price.toLocaleString("es-CL")}
                   </span>
                   <span
-                    className={`absolute top-0.5 right-0.5 sm:top-1 sm:right-1 text-[10px] font-bold px-1 py-0.5 rounded-full ${
+                    className={`absolute top-0.5 right-0.5 text-[8px] font-bold px-1 rounded-full ${
                       product.stock <= 5
                         ? "bg-red-100 text-red-600"
                         : "bg-green-100 text-green-600"
@@ -568,7 +560,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
                     {product.stock}
                   </span>
                   {cart[product.id] && (
-                    <span className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-secondary text-white text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center animate-bounce-in">
+                    <span className="absolute top-0.5 left-0.5 bg-secondary text-white text-[8px] sm:text-[10px] font-bold w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center">
                       {cart[product.id].quantity}
                     </span>
                   )}
@@ -579,155 +571,115 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
         ))}
       </div>
 
-      {/* Carrito - Barra flotante en móvil, sidebar en desktop */}
-      <div className={`lg:w-2/5 bg-gray-50 flex flex-col transition-all duration-300 ${
-        isCartExpanded 
-          ? 'fixed inset-0 z-[60] lg:relative lg:inset-auto' 
-          : 'fixed bottom-14 left-0 right-0 z-[45] lg:relative lg:bottom-auto lg:z-auto shadow-[0_-4px_20px_rgba(0,0,0,0.15)] lg:shadow-none rounded-t-2xl lg:rounded-none'
-      }`}>
-        {/* Header del carrito - tocable para expandir en móvil */}
+      {/* Carrito - Sidebar en desktop, expandible en móvil */}
+      <div className={`lg:w-2/5 bg-gray-50 flex flex-col ${isCartExpanded ? 'fixed inset-0 z-[60] lg:relative' : 'lg:relative'}`}>
+        {/* Header del carrito */}
         <div 
-          className={`p-3 sm:p-4 bg-gray-50 lg:bg-transparent cursor-pointer lg:cursor-default ${isCartExpanded ? 'border-b' : ''} lg:border-t-0`}
+          className={`p-2 sm:p-3 bg-gray-100 lg:bg-transparent cursor-pointer flex items-center justify-between ${isCartExpanded ? 'border-b' : ''}`}
           onClick={() => setIsCartExpanded(!isCartExpanded)}
         >
-          <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-xl font-bold text-text-primary flex items-center gap-2">
-              🛒 <span className="hidden sm:inline">Pedido</span>
-              {Object.keys(cart).length > 0 && (
-                <span className="bg-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                  {Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)}
-                </span>
-              )}
-            </h3>
-            
-            {/* En móvil: mostrar resumen inline y botón de cobrar */}
-            <div className="flex items-center gap-2 lg:hidden">
-              {Object.keys(cart).length > 0 && !isCartExpanded && (
-                <>
-                  <div className="flex items-center gap-1 text-xs text-gray-500">
-                    {Object.values(cart).slice(0, 2).map((item) => (
-                      <span key={item.id} className="bg-white px-1.5 py-0.5 rounded border truncate max-w-[60px]">
-                        {item.quantity}x {item.name.slice(0, 6)}
-                      </span>
-                    ))}
-                    {Object.keys(cart).length > 2 && (
-                      <span className="text-secondary font-medium">+{Object.keys(cart).length - 2}</span>
-                    )}
-                  </div>
-                  <span className="font-bold text-green-600 text-sm">${total.toLocaleString("es-CL")}</span>
-                </>
-              )}
-              <span className={`transition-transform duration-300 text-gray-400 ${isCartExpanded ? 'rotate-180' : ''}`}>
-                ▲
+          <h3 className="text-sm sm:text-base font-bold text-text-primary flex items-center gap-1">
+            🛒 <span className="hidden sm:inline">Pedido</span>
+            {Object.keys(cart).length > 0 && (
+              <span className="bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {Object.values(cart).reduce((sum, item) => sum + item.quantity, 0)}
               </span>
-            </div>
+            )}
+          </h3>
+          
+          {/* En móvil: mostrar total inline */}
+          <div className="flex items-center gap-2 lg:hidden">
+            {Object.keys(cart).length > 0 && !isCartExpanded && (
+              <span className="font-bold text-green-600 text-sm">${total.toLocaleString("es-CL")}</span>
+            )}
+            <span className={`text-gray-400 text-xs ${isCartExpanded ? 'rotate-180' : ''}`}>▲</span>
           </div>
         </div>
 
-        {/* Contenido expandible del carrito */}
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-          isCartExpanded ? 'max-h-[100vh] opacity-100' : 'max-h-0 lg:max-h-none opacity-0 lg:opacity-100'
-        }`}>
-          <div className="flex-1 p-3 sm:p-4 pt-0 flex flex-col min-h-0">
-            <div className="flex-grow overflow-y-auto -mr-2 pr-2">
-              {Object.keys(cart).length === 0 ? (
-                <p className="text-text-secondary text-center mt-6 text-sm">
-                  Toca productos para agregarlos
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {Object.values(cart).map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex justify-between items-center bg-white p-2 sm:p-3 rounded-xl shadow-sm"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{item.name}</p>
-                        <p className="text-xs text-text-secondary">
-                          ${item.price.toLocaleString("es-CL")} c/u
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <div className="flex items-center bg-gray-100 rounded-xl">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
-                            className="p-2.5 sm:p-2 active:bg-gray-300 rounded-l-xl touch-target"
-                          >
-                            <MinusIcon className="w-4 h-4" />
-                          </button>
-                          <span className="px-3 sm:px-4 font-bold text-sm min-w-[40px] text-center">{item.quantity}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
-                            className="p-2.5 sm:p-2 active:bg-gray-300 rounded-r-xl touch-target"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <p className="font-bold text-xs sm:text-sm text-primary w-16 sm:w-20 text-right">
-                          ${(item.price * item.quantity).toLocaleString("es-CL")}
-                        </p>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
-                          className="p-2.5 sm:p-2 text-red-500 active:bg-red-100 rounded-full touch-target"
-                        >
-                          <Trash2Icon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        {/* Contenido del carrito */}
+        <div className={`flex-1 flex flex-col overflow-hidden ${isCartExpanded ? 'opacity-100' : 'hidden lg:flex'}`}>
+          <div className="flex-1 p-2 sm:p-3 flex flex-col min-h-0 overflow-y-auto">
+            {Object.keys(cart).length === 0 ? (
+              <p className="text-text-secondary text-center mt-4 text-xs sm:text-sm">
+                Toca productos para agregarlos
+              </p>
+            ) : (
+              <ul className="space-y-1.5">
+                {Object.values(cart).map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex justify-between items-center bg-white p-2 rounded-lg shadow-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-xs sm:text-sm truncate">{item.name}</p>
+                      <p className="text-[10px] sm:text-xs text-text-secondary">
+                        ${item.price.toLocaleString("es-CL")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
+                        className="p-1.5 sm:p-2 active:bg-gray-200 rounded-lg touch-target"
+                      >
+                        <MinusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                      <span className="px-2 font-bold text-xs min-w-[24px] text-center">{item.quantity}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
+                        className="p-1.5 sm:p-2 active:bg-gray-200 rounded-lg touch-target"
+                      >
+                        <PlusIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                      <span className="font-bold text-xs sm:text-sm text-primary min-w-[40px] sm:min-w-[50px] text-right">
+                        ${(item.price * item.quantity).toLocaleString("es-CL")}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); removeFromCart(item.id); }}
+                        className="p-1.5 sm:p-2 text-red-500 active:bg-red-100 rounded-lg touch-target"
+                      >
+                        <Trash2Icon className="w-3 h-3 sm:w-4 sm:h-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-            {/* Notas del pedido */}
-            <div className="mt-2 sm:mt-3">
-              <input
-                type="text"
-                placeholder="Notas (ej: sin mayo, para llevar...)"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
-                autoComplete="off"
-              />
-            </div>
+          {/* Notas, método de pago y total */}
+          <div className="border-t p-2 sm:p-3 space-y-2">
+            {/* Notas */}
+            <input
+              type="text"
+              placeholder="Notas..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
+              autoComplete="off"
+            />
 
             {/* Método de pago */}
-            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-              <p className="text-sm font-medium text-gray-700 mb-2">Método de pago:</p>
+            <div>
+              <p className="text-[10px] sm:text-xs font-medium text-gray-600 mb-1">Método:</p>
               <PaymentMethodSelector
                 selected={paymentMethod}
                 onChange={setPaymentMethod}
               />
             </div>
 
-            {/* Total y botón de pago */}
-            <div className="border-t pt-3 sm:pt-4 mt-3 sm:mt-4 pb-20 sm:pb-4">
-              <div className="flex justify-between items-center font-bold text-xl sm:text-2xl text-text-primary">
-                <span>Total:</span>
-                <span className="text-green-600">${total.toLocaleString("es-CL")}</span>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); initiateSubmitSale(); }}
-                disabled={isLoading || Object.keys(cart).length === 0}
-                className="w-full mt-3 sm:mt-4 py-4 sm:py-3 text-white text-lg font-bold bg-green-600 rounded-xl shadow-lg active:bg-green-700 active:scale-[0.98] disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-target"
-              >
-                {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                    </svg>
-                    Procesando...
-                  </span>
-                ) : (
-                  <>
-                    <CheckCircleIcon className="w-6 h-6" />
-                    Cobrar ${total.toLocaleString("es-CL")}
-                  </>
-                )}
-              </button>
+            {/* Total y botón */}
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-lg sm:text-xl text-text-primary">Total:</span>
+              <span className="font-bold text-xl sm:text-2xl text-green-600">${total.toLocaleString("es-CL")}</span>
             </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); initiateSubmitSale(); }}
+              disabled={isLoading || Object.keys(cart).length === 0}
+              className="w-full py-2.5 sm:py-3 text-white text-sm sm:text-base font-bold bg-green-600 rounded-lg shadow active:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 touch-target"
+            >
+              {isLoading ? "Procesando..." : <>Cobrar ${total.toLocaleString("es-CL")}</>}
+            </button>
           </div>
         </div>
       </div>
@@ -917,10 +869,10 @@ export const SalesPage = ({ app, appId }) => {
         </div>
         <button
           onClick={() => setIsSaleModalOpen(true)}
-          disabled={products.filter((p) => p.stock > 0).length === 0}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-4 sm:py-3 text-white text-lg sm:text-base bg-green-600 rounded-2xl sm:rounded-full shadow-lg active:bg-green-700 active:scale-[0.98] transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+          disabled={availableProducts.length === 0}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 sm:py-2.5 text-sm sm:text-base bg-green-600 rounded-lg sm:rounded-full shadow active:bg-green-700 active:scale-[0.98] transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed touch-target"
         >
-          <PlusCircleIcon className="w-6 h-6" />
+          <PlusCircleIcon className="w-5 h-5 sm:w-6 sm:h-6" />
           <span>Nueva Venta</span>
         </button>
       </div>
