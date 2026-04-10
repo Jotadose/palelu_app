@@ -1,21 +1,14 @@
-// Firebase config - las variables se cargan desde Vite.env (desarrollo) o Vercel (producción)
+// Firebase config - valores de producción hardcoded para el deploy actual
+// (las variables de entorno no se están cargando correctamente en Vercel)
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-api-key",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "demo.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "demo.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abc123",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-DEMO123"
+  apiKey: "AIzaSyCUZWOMZAT3tad-NjpGxwLgS9X9dVs40QA",
+  authDomain: "gestor-palelu-final.firebaseapp.com",
+  projectId: "gestor-palelu-final",
+  storageBucket: "gestor-palelu-final.firebasestorage.app",
+  messagingSenderId: "86219323184",
+  appId: "1:86219323184:web:aa290991d5b7b029963af5",
+  measurementId: "G-KDNSY9QN65"
 };
-
-// Debug: mostrar qué config se usa (solo en desarrollo)
-if (import.meta.env.DEV) {
-  console.log("🔧 Firebase Config (dev):", {
-    projectId: firebaseConfig.projectId,
-    hasApiKey: !!firebaseConfig.apiKey
-  });
-}
 
 export { firebaseConfig };
