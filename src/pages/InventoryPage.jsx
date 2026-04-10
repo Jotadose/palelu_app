@@ -686,15 +686,15 @@ export const InventoryPage = ({ app, appId }) => {
           />
           <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         </div>
-        {inventoryView === "maestro" && (
-          <button
-            onClick={openAddModal}
-            className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
-          >
-            <PlusCircleIcon className="w-5 h-5" />
-            <span className="hidden sm:inline">Agregar</span>
-          </button>
-        )}
+        <button
+          onClick={openAddModal}
+          className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
+        >
+          <PlusCircleIcon className="w-5 h-5" />
+          <span className="hidden sm:inline">
+            {inventoryView === "evento" ? "Agregar al Evento" : "Agregar"}
+          </span>
+        </button>
       </div>
 
       {isLoading ? (
