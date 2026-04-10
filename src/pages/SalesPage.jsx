@@ -3,16 +3,19 @@ import {
   getFirestore,
   collection,
   query,
+  where,
   onSnapshot,
   addDoc,
   updateDoc,
   doc,
   writeBatch,
+  limit,
   Timestamp,
 } from "firebase/firestore";
 import { useToast } from "../contexts/ToastContext";
 import { useAuth } from "../contexts/AuthContext";
 import { useCashSession } from "../contexts/CashSessionContext";
+import { useEvent } from "../contexts/EventContext";
 import { Modal, StatCard, Button } from "../components/UI";
 import {
   PlusCircleIcon,
@@ -308,7 +311,7 @@ const PaymentMethodSelector = ({ selected, onChange }) => {
 };
 
 // Formulario de Venta
-const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sessionId }) => {
+const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sessionId, eventId, updateEventStock }) => {
   const { showToast } = useToast();
   const db = getFirestore(app);
   const [cart, setCart] = useState({});
@@ -323,7 +326,8 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
   const addToCart = (product) => {
     setCart((prevCart) => {
       const currentQty = prevCart[product.id]?.quantity || 0;
-      if (currentQty >= product.stock) {
+      const availableStock = product.stock; // Ya viene con el stock correcto (evento o maestro)
+      if (currentQty >= availableStock) {
         showToast(`No hay más stock de ${product.name}`, "error");
         return prevCart;
       }
@@ -414,7 +418,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
         subtotal: item.price * item.quantity,
       }));
 
-      // Crear la orden
+      // Crear la orden - incluir eventId si hay evento activo
       const orderData = {
         orderNumber,
         items: orderItems,
@@ -423,6 +427,7 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
         notes: notes.trim(),
         sellerId: userId,
         sessionId: sessionId || null,
+        eventId: eventId || null, // Guardar eventId en la orden
         status: "completed",
         createdAt: Timestamp.now(),
         // Agregar info de pago en efectivo si aplica
@@ -435,13 +440,40 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
       const orderRef = doc(collection(db, ordersPath));
       batch.set(orderRef, orderData);
 
-      // Actualizar stock de productos
-      for (const item of Object.values(cart)) {
-        const productRef = doc(db, productsPath, item.id);
-        batch.update(productRef, { stock: item.stock - item.quantity });
+      // Actualizar stock - si hay evento, usar inventario del evento; si no, usar maestro
+      if (eventId) {
+        // Actualizar inventario del evento
+        for (const item of Object.values(cart)) {
+          const eventInventoryPath = `artifacts/${appId}/public/data/events/${eventId}/eventInventories`;
+          const eventInventoryQuery = query(
+            collection(db, eventInventoryPath),
+            where("productId", "==", item.id),
+            limit(1)
+          );
+          // We'll do this after getting the snapshot - for now just update in batch logic
+          // Actually, we need to do this differently - get the doc first
+        }
+        
+        // Por ahora, actualizar directamente el inventario del evento
+        // (Esto requiere una aproximación diferente - usaremos updateDoc fuera del batch)
+      }
+
+      // Actualizar stock de productos (maestro) - solo si no hay evento activo
+      if (!eventId) {
+        for (const item of Object.values(cart)) {
+          const productRef = doc(db, productsPath, item.id);
+          batch.update(productRef, { stock: item.stock - item.quantity });
+        }
       }
 
       await batch.commit();
+
+      // Si hay evento activo, actualizar inventario del evento fuera del batch
+      if (eventId && updateEventStock) {
+        for (const item of Object.values(cart)) {
+          await updateEventStock(item.id, item.quantity);
+        }
+      }
 
       showToast("¡Venta registrada con éxito!");
       onSaleComplete({ id: orderRef.id, ...orderData });
@@ -715,20 +747,23 @@ const SalesForm = ({ userId, products, onClose, onSaleComplete, app, appId, sess
 export const SalesPage = ({ app, appId }) => {
   const { user } = useAuth();
   const { currentSession, isSessionOpen } = useCashSession();
+  const { currentEvent, eventInventory, isEventActive, updateEventStock, getAvailableProducts } = useEvent();
   const db = getFirestore(app);
 
-  const [products, setProducts] = useState([]);
+  const [masterProducts, setMasterProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
 
+  // Cargar productos - maestro o evento según corresponda
   useEffect(() => {
+    // Cargar maestro siempre
     const productsQuery = query(
       collection(db, `artifacts/${appId}/public/data/products`)
     );
     const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
-      setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setMasterProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
 
     const ordersQuery = query(
@@ -753,6 +788,16 @@ export const SalesPage = ({ app, appId }) => {
       unsubscribeOrders();
     };
   }, [db, appId]);
+
+  // Determinar productos disponibles (evento o maestro)
+  const availableProducts = useMemo(() => {
+    // Si hay evento activo y tiene inventario, usar inventario del evento
+    if (isEventActive && eventInventory.length > 0) {
+      return eventInventory.filter(p => p.stock > 0);
+    }
+    // De lo contrario, usar inventario maestro
+    return masterProducts.filter(p => p.stock > 0);
+  }, [isEventActive, eventInventory, masterProducts]);
 
   // Filtrar órdenes de hoy
   const todayOrders = useMemo(() => {
@@ -836,12 +881,14 @@ export const SalesPage = ({ app, appId }) => {
         ) : (
           <SalesForm
             userId={user?.uid}
-            products={products.filter((p) => p.stock > 0)}
+            products={availableProducts}
             onClose={handleCloseSaleModal}
             onSaleComplete={handleSaleComplete}
             app={app}
             appId={appId}
             sessionId={currentSession?.id}
+            eventId={currentEvent?.id || null}
+            updateEventStock={updateEventStock}
           />
         )}
       </Modal>

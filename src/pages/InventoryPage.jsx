@@ -11,6 +11,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { useToast } from "../contexts/ToastContext";
+import { useEvent } from "../contexts/EventContext";
 import { Modal } from "../components/UI";
 import {
   SearchIcon,
@@ -521,6 +522,7 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
 
 export const InventoryPage = ({ app, appId }) => {
   const { showToast } = useToast();
+  const { currentEvent, eventInventory, isEventActive } = useEvent();
   const db = getFirestore(app);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -529,6 +531,15 @@ export const InventoryPage = ({ app, appId }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [mermaModalOpen, setMermaModalOpen] = useState(false);
   const [productForMerma, setProductForMerma] = useState(null);
+  const [inventoryView, setInventoryView] = useState("maestro"); // "maestro" o "evento"
+
+  // Determinar qué inventario mostrar
+  const displayProducts = useMemo(() => {
+    if (inventoryView === "evento" && isEventActive && eventInventory.length > 0) {
+      return eventInventory;
+    }
+    return products;
+  }, [inventoryView, isEventActive, eventInventory, products]);
 
   const openMermaModal = (product) => {
     setProductForMerma(product);
@@ -554,10 +565,10 @@ export const InventoryPage = ({ app, appId }) => {
   }, [db, appId]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) =>
+    return displayProducts.filter((p) =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [products, searchTerm]);
+  }, [displayProducts, searchTerm]);
 
   const groupedProducts = useMemo(() => {
     if (filteredProducts.length === 0) return {};
@@ -623,18 +634,59 @@ export const InventoryPage = ({ app, appId }) => {
       {/* Header - Optimizado para móvil */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Inventario</h1>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
-            <input
-              type="text"
-              placeholder="Buscar producto..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
-              autoComplete="off"
-            />
-            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        
+        {/* Selector de vista de inventario */}
+        {currentEvent && (
+          <div className="flex bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => setInventoryView("maestro")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                inventoryView === "maestro"
+                  ? "bg-white text-pink-600 shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              📋 Maestro
+            </button>
+            <button
+              onClick={() => setInventoryView("evento")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
+                inventoryView === "evento"
+                  ? "bg-white text-pink-600 shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              🎉 Evento
+            </button>
           </div>
+        )}
+      </div>
+
+      {/* Info del evento activo si está en vista de evento */}
+      {inventoryView === "evento" && currentEvent && (
+        <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 flex items-center gap-2">
+          <span className="text-sm">📦 Mostrando inventario de:</span>
+          <span className="font-bold text-pink-700">{currentEvent.name}</span>
+          <span className="text-xs text-gray-500">
+            ({eventInventory.reduce((sum, p) => sum + (p.stock || 0), 0)} unid.)
+          </span>
+        </div>
+      )}
+
+      {/* Barra de búsqueda y botón agregar */}
+      <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="relative flex-1 sm:w-64">
+          <input
+            type="text"
+            placeholder="Buscar producto..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-400 touch-target"
+            autoComplete="off"
+          />
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        </div>
+        {inventoryView === "maestro" && (
           <button
             onClick={openAddModal}
             className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
@@ -642,7 +694,7 @@ export const InventoryPage = ({ app, appId }) => {
             <PlusCircleIcon className="w-5 h-5" />
             <span className="hidden sm:inline">Agregar</span>
           </button>
-        </div>
+        )}
       </div>
 
       {isLoading ? (
