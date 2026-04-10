@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   getFirestore,
   collection,
@@ -13,7 +13,6 @@ import {
 import { useToast } from "../contexts/ToastContext";
 import { useEvent } from "../contexts/EventContext";
 import { Modal } from "../components/UI";
-import { EventCreateModal } from "../components/EventCreateModal";
 import { ImportProductsToEventModal } from "../components/ImportProductsToEventModal";
 import {
   SearchIcon,
@@ -25,7 +24,302 @@ import {
   UploadIcon,
   XIcon,
   TrendingDownIcon,
+  CopyIcon,
 } from "../components/Icons";
+
+// Categorías por defecto
+const defaultCategories = [
+  "Hamburguesas",
+  "Pizzas",
+  "Bebidas",
+  "Complementos",
+  "Postres",
+  "Otros",
+];
+
+// Compresión de imagen
+const compressImage = async (base64Str) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxSize = 400;
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxSize) {
+          height *= maxSize / width;
+          width = maxSize;
+        }
+      } else {
+        if (height > maxSize) {
+          width *= maxSize / height;
+          height = maxSize;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+  });
+};
+
+const convertToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+// Modal para crear producto exclusivo del evento
+const CreateEventProductModal = ({ isOpen, onClose, eventId, appId, db }) => {
+  const { showToast } = useToast();
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
+  const [category, setCategory] = useState("Otros");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imagePreview, setImagePreview] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [categories, setCategories] = useState(defaultCategories);
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  // Resetear cuando se cierra
+  useEffect(() => {
+    if (!isOpen) {
+      setName("");
+      setPrice("");
+      setStock("");
+      setCategory("Otros");
+      setImageUrl("");
+      setImagePreview("");
+    }
+  }, [isOpen]);
+
+  const handleImageCapture = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCapturing(true);
+    try {
+      const base64 = await convertToBase64(file);
+      const compressed = await compressImage(base64);
+      setImagePreview(compressed);
+      setImageUrl(compressed);
+      showToast("Imagen capturada ✓");
+    } catch (error) {
+      console.error("Error procesando imagen:", error);
+      showToast("Error al procesar la imagen", "error");
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  const clearImage = () => {
+    setImageUrl("");
+    setImagePreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name || !price || !stock) {
+      showToast("Nombre, precio y stock son obligatorios.", "error");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const productData = {
+        name,
+        price: parseFloat(price),
+        stock: parseInt(stock, 10),
+        category,
+        imageUrl: imageUrl.trim(),
+        active: true,
+        isEventExclusive: true, // Marca como producto exclusivo del evento
+      };
+
+      // Agregar al inventario del evento
+      const inventoryPath = `artifacts/${appId}/public/data/events/${eventId}/eventInventories`;
+      await addDoc(collection(db, inventoryPath), {
+        ...productData,
+        productId: null, // No tiene对应 en el maestro
+        initialStock: parseInt(stock, 10),
+        currentStock: parseInt(stock, 10),
+        sold: 0,
+        createdAt: Timestamp.now(),
+      });
+
+      showToast("Producto creado para el evento ✓");
+      onClose();
+    } catch (error) {
+      console.error("Error creando producto:", error);
+      showToast("Error al crear el producto", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="🎉 Crear Producto para Evento" fullScreenMobile>
+      <form onSubmit={handleSubmit} className="space-y-4 p-2 sm:p-4">
+        {/* Nombre */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            📝 Nombre del Producto
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ej: Choripán Especial"
+            className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 touch-target"
+            required
+          />
+        </div>
+
+        {/* Precio y Stock */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              💸 Precio
+            </label>
+            <input
+              type="number"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              min="0"
+              step="1"
+              inputMode="numeric"
+              className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 touch-target"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              📦 Stock Inicial
+            </label>
+            <input
+              type="number"
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              min="0"
+              step="1"
+              inputMode="numeric"
+              className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 touch-target"
+              required
+            />
+          </div>
+        </div>
+
+        {/* Categoría */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            🗃️ Categoría
+          </label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="mt-1 block w-full pl-4 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 rounded-xl touch-target"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Imagen */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            📷 Imagen (opcional)
+          </label>
+          {imagePreview ? (
+            <div className="relative inline-block">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-24 h-24 object-cover rounded-xl"
+              />
+              <button
+                type="button"
+                onClick={clearImage}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={isCapturing}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-green-100 text-green-700 rounded-xl font-medium active:bg-green-200 disabled:opacity-50 touch-target"
+              >
+                <CameraIcon className="w-5 h-5" />
+                <span className="text-sm">Cámara</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isCapturing}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-xl font-medium active:bg-blue-200 disabled:opacity-50 touch-target"
+              >
+                <UploadIcon className="w-5 h-5" />
+                <span className="text-sm">Galería</span>
+              </button>
+            </div>
+          )}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleImageCapture}
+            className="hidden"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageCapture}
+            className="hidden"
+          />
+        </div>
+
+        {/* Botones */}
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-3 text-base font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl active:bg-gray-200 touch-target"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="flex-1 px-4 py-3 text-base font-medium text-white bg-pink-600 border border-transparent rounded-xl shadow-sm active:bg-pink-700 disabled:bg-pink-300 touch-target"
+          >
+            {isLoading ? "Guardando..." : "Crear Producto"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
 
 // Modal de Merma de Producto
 const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
@@ -50,7 +344,6 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
 
     setIsLoading(true);
     try {
-      // Registrar movimiento de merma
       const movementData = {
         productId: product.id,
         productName: product.name,
@@ -68,11 +361,17 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
         movementData
       );
 
-      // Actualizar stock del producto
-      await updateDoc(
-        doc(db, `artifacts/${appId}/public/data/products`, product.id),
-        { stock: product.stock - quantity }
-      );
+      // Determinar la ruta según si es producto del evento o del maestro
+      let productRef;
+      if (product.isEventProduct) {
+        // Producto del evento
+        productRef = doc(db, `artifacts/${appId}/public/data/events/${product.eventId}/eventInventories`, product.id);
+      } else {
+        // Producto del maestro
+        productRef = doc(db, `artifacts/${appId}/public/data/products`, product.id);
+      }
+
+      await updateDoc(productRef, { stock: product.stock - quantity });
 
       showToast(`Merma registrada: -${quantity} ${product.name}`);
       onSuccess?.();
@@ -90,7 +389,6 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📉 Registrar Merma" fullScreenMobile>
       <form onSubmit={handleSubmit} className="space-y-4 p-2 sm:p-4">
-        {/* Info del producto */}
         <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3">
           {product.imageUrl ? (
             <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-lg object-cover" />
@@ -100,84 +398,56 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
             </div>
           )}
           <div>
-            <p className="font-bold text-gray-800">{product.name}</p>
-            <p className="text-sm text-gray-600">Stock actual: <span className="font-semibold text-green-600">{product.stock} unidades</span></p>
+            <p className="font-bold">{product.name}</p>
+            <p className="text-sm text-gray-500">Stock actual: {product.stock}</p>
           </div>
         </div>
 
-        {/* Cantidad */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Cantidad a dar de baja
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="p-3 bg-gray-100 rounded-xl active:bg-gray-200 touch-target"
-            >
-              <span className="text-xl font-bold">−</span>
-            </button>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(Math.min(product.stock, Math.max(1, parseInt(e.target.value) || 1)))}
-              min="1"
-              max={product.stock}
-              className="flex-1 text-center text-2xl font-bold py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-            <button
-              type="button"
-              onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-              className="p-3 bg-gray-100 rounded-xl active:bg-gray-200 touch-target"
-            >
-              <span className="text-xl font-bold">+</span>
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1 text-center">
-            Nuevo stock: <span className="font-semibold text-red-600">{product.stock - quantity}</span> unidades
-          </p>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Cantidad a descartar</label>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, Math.min(product.stock, parseInt(e.target.value) || 1)))}
+            min="1"
+            max={product.stock}
+            className="w-full px-4 py-3 text-lg font-bold text-center border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+          />
         </div>
 
-        {/* Razón */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Razón de la merma
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Motivo</label>
           <div className="grid grid-cols-2 gap-2">
             {reasons.map((r) => (
               <button
                 key={r.id}
                 type="button"
                 onClick={() => setReason(r.id)}
-                className={`p-3 text-left rounded-xl border-2 transition-all ${
+                className={`p-3 text-left rounded-lg border-2 transition-all ${
                   reason === r.id
-                    ? "border-red-500 bg-red-50"
-                    : "border-gray-200 bg-white active:bg-gray-50"
+                    ? "border-pink-500 bg-pink-50"
+                    : "border-gray-200 active:border-gray-300"
                 }`}
               >
-                <span className="font-medium text-sm">{r.label}</span>
+                <p className="font-medium text-sm">{r.label}</p>
+                <p className="text-xs text-gray-500">{r.description}</p>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Notas */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Notas (opcional)
-          </label>
-          <input
-            type="text"
+          <label className="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+          <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Ej: Venció el 28/11..."
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 touch-target"
+            placeholder="Detalles adicionales..."
+            className="w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
+            rows={2}
           />
         </div>
 
-        {/* Botones */}
-        <div className="flex gap-3 pt-4 pb-safe">
+        <div className="flex gap-3 pt-4">
           <button
             type="button"
             onClick={onClose}
@@ -187,10 +457,10 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
           </button>
           <button
             type="submit"
-            disabled={isLoading || quantity < 1}
-            className="flex-1 px-4 py-3 text-base font-medium text-white bg-red-600 rounded-xl shadow-sm active:bg-red-700 disabled:bg-red-300 touch-target"
+            disabled={isLoading}
+            className="flex-1 px-4 py-3 text-base font-medium text-white bg-red-600 border border-transparent rounded-xl shadow-sm active:bg-red-700 disabled:bg-red-300 touch-target"
           >
-            {isLoading ? "Registrando..." : "Confirmar Merma"}
+            {isLoading ? "Guardando..." : "Registrar Merma"}
           </button>
         </div>
       </form>
@@ -198,95 +468,36 @@ const MermaModal = ({ isOpen, onClose, product, appId, db, onSuccess }) => {
   );
 };
 
+// Formulario para producto del maestro (reutilizado)
 const ProductForm = ({ onClose, appId, db, productToEdit }) => {
   const { showToast } = useToast();
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("");
-  const [category, setCategory] = useState("🥤 Bebestible");
-  const [imageUrl, setImageUrl] = useState("");
-  const [imagePreview, setImagePreview] = useState("");
+  const isEditing = !!productToEdit?.id;
+
+  const [name, setName] = useState(productToEdit?.name || "");
+  const [price, setPrice] = useState(productToEdit?.price?.toString() || "");
+  const [stock, setStock] = useState(productToEdit?.stock?.toString() || "");
+  const [category, setCategory] = useState(productToEdit?.category || "Otros");
+  const [imageUrl, setImageUrl] = useState(productToEdit?.imageUrl || "");
+  const [imagePreview, setImagePreview] = useState(productToEdit?.imageUrl || "");
   const [isLoading, setIsLoading] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-  const fileInputRef = React.useRef(null);
-  const cameraInputRef = React.useRef(null);
-  const isEditing = !!productToEdit;
-
-  const categories = [
-    "🥤 Bebestible",
-    "🥖 Chaparrita",
-    "🥟 Empanada",
-    "🍕 Pizza",
-    "🍬 Dulce",
-    "🍟 Papas Fritas",
-    "🥙 Snack Saludable",
-    "🥓 Snack No Saludable",
-    "🍪 Otro",
-  ];
+  const [categories, setCategories] = useState(defaultCategories);
+  const cameraInputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
-    if (isEditing) {
-      setName(productToEdit.name);
-      setPrice(productToEdit.price.toString());
-      setStock(productToEdit.stock.toString());
-      setCategory(productToEdit.category || "🍪 Otro");
-      setImageUrl(productToEdit.imageUrl || "");
-      setImagePreview(productToEdit.imageUrl || "");
-    }
-  }, [isEditing, productToEdit]);
+    setCategories(defaultCategories);
+  }, []);
 
-  // Función para convertir imagen a Base64
-  const convertToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  // Función para comprimir imagen
-  const compressImage = (base64, maxWidth = 400, quality = 0.7) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ratio = maxWidth / img.width;
-        canvas.width = maxWidth;
-        canvas.height = img.height * ratio;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-    });
-  };
-
-  // Manejar captura de imagen (cámara o galería)
-  const handleImageCapture = async (event) => {
-    const file = event.target.files?.[0];
+  const handleImageCapture = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-
-    // Verificar que sea una imagen
-    if (!file.type.startsWith('image/')) {
-      showToast("Por favor selecciona una imagen válida", "error");
-      return;
-    }
-
-    // Verificar tamaño (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("La imagen es muy grande (máx 5MB)", "error");
-      return;
-    }
-
     setIsCapturing(true);
     try {
       const base64 = await convertToBase64(file);
       const compressed = await compressImage(base64);
       setImagePreview(compressed);
-      setImageUrl(compressed); // Guardaremos el base64 como URL
+      setImageUrl(compressed);
       showToast("Imagen capturada ✓");
     } catch (error) {
       console.error("Error procesando imagen:", error);
@@ -296,7 +507,6 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
     }
   };
 
-  // Limpiar imagen
   const clearImage = () => {
     setImageUrl("");
     setImagePreview("");
@@ -332,9 +542,9 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
         showToast("Producto agregado con éxito");
       }
       onClose();
-    } catch (err) {
-      console.error("Error guardando producto: ", err);
-      showToast("No se pudo guardar el producto.", "error");
+    } catch (error) {
+      console.error("Error guardando producto:", error);
+      showToast("Error al guardar el producto", "error");
     } finally {
       setIsLoading(false);
     }
@@ -343,138 +553,20 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-2 sm:p-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          ✍️ Nombre del Producto
-        </label>
+        <label className="block text-sm font-medium text-gray-700">📝 Nombre</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 touch-target"
+          placeholder="Nombre del producto"
+          className="mt-1 block w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
           required
-          autoComplete="off"
         />
       </div>
 
-      {/* Sección de imagen con cámara */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          📸 Imagen del Producto
-        </label>
-        
-        {/* Preview de imagen */}
-        {imagePreview ? (
-          <div className="relative mb-3">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="w-full h-40 object-contain bg-gray-100 rounded-xl border-2 border-gray-200"
-            />
-            <button
-              type="button"
-              onClick={clearImage}
-              className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg active:bg-red-600"
-            >
-              <XIcon className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="w-full h-32 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center mb-3">
-            <div className="text-center text-gray-400">
-              <ImageIcon className="w-10 h-10 mx-auto mb-1" />
-              <span className="text-xs">Sin imagen</span>
-            </div>
-          </div>
-        )}
-
-        {/* Botones de captura */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* Botón Cámara */}
-          <button
-            type="button"
-            onClick={() => cameraInputRef.current?.click()}
-            disabled={isCapturing}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-pink-100 text-pink-700 rounded-xl font-medium active:bg-pink-200 disabled:opacity-50 touch-target"
-          >
-            <CameraIcon className="w-5 h-5" />
-            <span className="text-sm">Cámara</span>
-          </button>
-          
-          {/* Botón Galería */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isCapturing}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-xl font-medium active:bg-blue-200 disabled:opacity-50 touch-target"
-          >
-            <UploadIcon className="w-5 h-5" />
-            <span className="text-sm">Galería</span>
-          </button>
-        </div>
-
-        {/* Inputs ocultos */}
-        <input
-          ref={cameraInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleImageCapture}
-          className="hidden"
-        />
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageCapture}
-          className="hidden"
-        />
-
-        {/* Loading de captura */}
-        {isCapturing && (
-          <div className="mt-2 text-center text-sm text-gray-500">
-            <span className="animate-pulse">Procesando imagen...</span>
-          </div>
-        )}
-
-        {/* Input URL alternativo (colapsado) */}
-        <details className="mt-3">
-          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-            O pegar URL de imagen...
-          </summary>
-          <input
-            type="text"
-            value={imageUrl.startsWith('data:') ? '' : imageUrl}
-            onChange={(e) => {
-              setImageUrl(e.target.value);
-              setImagePreview(e.target.value);
-            }}
-            placeholder="https://ejemplo.com/imagen.jpg"
-            className="mt-2 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
-          />
-        </details>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
-          🗃️ Categoría
-        </label>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="mt-1 block w-full pl-4 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 rounded-xl touch-target"
-        >
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            💸 Precio
-          </label>
+          <label className="block text-sm font-medium text-gray-700">💸 Precio</label>
           <input
             type="number"
             value={price}
@@ -482,14 +574,12 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
             min="0"
             step="1"
             inputMode="numeric"
-            className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 touch-target"
+            className="mt-1 block w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            📦 Stock
-          </label>
+          <label className="block text-sm font-medium text-gray-700">📦 Stock</label>
           <input
             type="number"
             value={stock}
@@ -497,24 +587,53 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
             min="0"
             step="1"
             inputMode="numeric"
-            className="mt-1 block w-full px-4 py-3 text-base bg-white border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 touch-target"
+            className="mt-1 block w-full px-4 py-3 text-base border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500"
             required
           />
         </div>
       </div>
-      <div className="flex gap-3 pt-4 pb-safe">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex-1 px-4 py-3 text-base font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl active:bg-gray-200 touch-target"
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">🗃️ Categoría</label>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="mt-1 block w-full pl-4 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 rounded-xl"
         >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="flex-1 px-4 py-3 text-base font-medium text-white bg-pink-600 border border-transparent rounded-xl shadow-sm active:bg-pink-700 disabled:bg-pink-300 touch-target"
-        >
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">📷 Imagen</label>
+        {imagePreview ? (
+          <div className="relative inline-block">
+            <img src={imagePreview} alt="Preview" className="w-24 h-24 object-cover rounded-xl" />
+            <button type="button" onClick={clearImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1">
+              <XIcon className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={isCapturing} className="flex items-center justify-center gap-2 px-4 py-3 bg-green-100 text-green-700 rounded-xl font-medium active:bg-green-200 disabled:opacity-50">
+              <CameraIcon className="w-5 h-5" />
+              <span className="text-sm">Cámara</span>
+            </button>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isCapturing} className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-700 rounded-xl font-medium active:bg-blue-200 disabled:opacity-50">
+              <UploadIcon className="w-5 h-5" />
+              <span className="text-sm">Galería</span>
+            </button>
+          </div>
+        )}
+        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageCapture} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageCapture} className="hidden" />
+      </div>
+
+      <div className="flex gap-3 pt-4">
+        <button type="button" onClick={onClose} className="flex-1 px-4 py-3 text-base font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-xl active:bg-gray-200">Cancelar</button>
+        <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 text-base font-medium text-white bg-pink-600 border border-transparent rounded-xl shadow-sm active:bg-pink-700 disabled:bg-pink-300">
           {isLoading ? "Guardando..." : isEditing ? "Actualizar" : "Agregar"}
         </button>
       </div>
@@ -524,7 +643,7 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
 
 export const InventoryPage = ({ app, appId }) => {
   const { showToast } = useToast();
-  const { currentEvent, eventInventory, isEventActive, getMasterProducts } = useEvent();
+  const { currentEvent, eventInventory, isEventActive, getMasterProducts, createEvent } = useEvent();
   const db = getFirestore(app);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -533,9 +652,10 @@ export const InventoryPage = ({ app, appId }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [mermaModalOpen, setMermaModalOpen] = useState(false);
   const [productForMerma, setProductForMerma] = useState(null);
-  const [inventoryView, setInventoryView] = useState("maestro"); // "maestro" o "evento"
+  const [inventoryView, setInventoryView] = useState("maestro");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showCreateEventProductModal, setShowCreateEventProductModal] = useState(false);
 
-  // Determinar qué inventario mostrar
   const displayProducts = useMemo(() => {
     if (inventoryView === "evento" && isEventActive && eventInventory.length > 0) {
       return eventInventory;
@@ -550,19 +670,13 @@ export const InventoryPage = ({ app, appId }) => {
 
   useEffect(() => {
     const q = query(collection(db, `artifacts/${appId}/public/data/products`));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setProducts(
-          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-        );
-        setIsLoading(false);
-      },
-      (error) => {
-        console.error("Error al obtener productos:", error);
-        setIsLoading(false);
-      }
-    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error al obtener productos:", error);
+      setIsLoading(false);
+    });
     return () => unsubscribe();
   }, [db, appId]);
 
@@ -588,31 +702,18 @@ export const InventoryPage = ({ app, appId }) => {
   };
 
   const openAddToEventModal = () => {
-    // En vista evento: abrir modal para agregar productos del maestro al evento
-    if (inventoryView === "evento" && currentEvent) {
-      // Emitir un evento o usar un estado para abrir el modal de importar del maestro
-      setShowImportModal(true);
-    } else {
-      setProductToEdit(null);
-      setIsModalOpen(true);
-    }
+    // Mostrar opciones: importar del maestro O crear producto exclusivo
+    setShowImportModal(true);
   };
 
-  const [showImportModal, setShowImportModal] = useState(false);
-
-  const openEditModal = (product) => {
-    setProductToEdit(product);
-    setIsModalOpen(true);
+  const openCreateEventProductModal = () => {
+    setShowCreateEventProductModal(true);
   };
 
   const handleDelete = async (productId) => {
-    if (
-      window.confirm("¿Estás seguro de que quieres eliminar este producto?")
-    ) {
+    if (window.confirm("¿Estás seguro de que quieres eliminar este producto?")) {
       try {
-        await deleteDoc(
-          doc(db, `artifacts/${appId}/public/data/products`, productId)
-        );
+        await deleteDoc(doc(db, `artifacts/${appId}/public/data/products`, productId));
         showToast("Producto eliminado");
       } catch (error) {
         console.error("Error al eliminar producto:", error);
@@ -653,22 +754,31 @@ export const InventoryPage = ({ app, appId }) => {
         appId={appId}
       />
 
-      {/* Header - Optimizado para móvil */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Inventario</h1>
-        
-        {/* Selector de vista de inventario */}
-        {currentEvent && (
-          <div className="flex bg-gray-100 rounded-xl p-1">
+      <CreateEventProductModal
+        isOpen={showCreateEventProductModal}
+        onClose={() => setShowCreateEventProductModal(false)}
+        eventId={currentEvent?.id}
+        appId={appId}
+        db={db}
+      />
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">📦 Inventario</h1>
+          <p className="text-gray-500 text-sm">Gestiona tus productos</p>
+        </div>
+        {/* Selector de vista */}
+        {currentEvent && isEventActive && (
+          <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setInventoryView("maestro")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
                 inventoryView === "maestro"
                   ? "bg-white text-pink-600 shadow-sm"
                   : "text-gray-500"
               }`}
             >
-              📋 Maestro
+              🏠 Maestro
             </button>
             <button
               onClick={() => setInventoryView("evento")}
@@ -684,18 +794,16 @@ export const InventoryPage = ({ app, appId }) => {
         )}
       </div>
 
-      {/* Info del evento activo si está en vista de evento */}
       {inventoryView === "evento" && currentEvent && (
         <div className="bg-pink-50 border border-pink-200 rounded-xl p-3 flex items-center gap-2">
-          <span className="text-sm">📦 Mostrando inventario de:</span>
+          <span className="text-sm">📦 Inventario de:</span>
           <span className="font-bold text-pink-700">{currentEvent.name}</span>
           <span className="text-xs text-gray-500">
-            ({eventInventory.reduce((sum, p) => sum + (p.stock || 0), 0)} unid.)
+            ({eventInventory.reduce((sum, p) => sum + (p.currentStock || p.stock || 0), 0)} unid.)
           </span>
         </div>
       )}
 
-      {/* Barra de búsqueda y botón agregar */}
       <div className="flex items-center gap-3 w-full sm:w-auto">
         <div className="relative flex-1 sm:w-64">
           <input
@@ -708,15 +816,49 @@ export const InventoryPage = ({ app, appId }) => {
           />
           <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         </div>
-        <button
-          onClick={inventoryView === "evento" ? openAddToEventModal : openAddModal}
-          className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
-        >
-          <PlusCircleIcon className="w-5 h-5" />
-          <span className="hidden sm:inline">
-            {inventoryView === "evento" ? "Agregar al Evento" : "Agregar"}
-          </span>
-        </button>
+
+        {/* Botón principal con dropdown para evento */}
+        {inventoryView === "evento" && currentEvent ? (
+          <div className="relative group">
+            <button
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 transition-all touch-target"
+            >
+              <PlusCircleIcon className="w-5 h-5" />
+              <span className="hidden sm:inline">Agregar</span>
+            </button>
+            {/* Dropdown */}
+            <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50 hidden group-hover:block">
+              <button
+                onClick={openAddToEventModal}
+                className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 rounded-t-xl"
+              >
+                <CopyIcon className="w-5 h-5 text-blue-500" />
+                <div>
+                  <p className="font-medium text-sm">📥 Importar del Maestro</p>
+                  <p className="text-xs text-gray-500">Copiar productos existentes</p>
+                </div>
+              </button>
+              <button
+                onClick={openCreateEventProductModal}
+                className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 rounded-b-xl"
+              >
+                <PlusCircleIcon className="w-5 h-5 text-green-500" />
+                <div>
+                  <p className="font-medium text-sm">🆕 Crear Producto Exclusivo</p>
+                  <p className="text-xs text-gray-500">Solo para este evento</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={openAddModal}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
+          >
+            <PlusCircleIcon className="w-5 h-5" />
+            <span className="hidden sm:inline">Agregar</span>
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -730,24 +872,17 @@ export const InventoryPage = ({ app, appId }) => {
       ) : Object.keys(groupedProducts).length === 0 ? (
         <div className="text-center py-16 px-4 bg-white rounded-xl shadow-md">
           <h3 className="text-xl font-medium text-gray-700">
-            {searchTerm
-              ? "No se encontraron productos"
-              : "Tu inventario está vacío"}
+            {searchTerm ? "No se encontraron productos" : "Tu inventario está vacío"}
           </h3>
           <p className="mt-2 text-gray-500">
-            {searchTerm
-              ? `Intenta con otra búsqueda.`
-              : "¡Agrega tu primer producto para empezar a vender!"}
+            {searchTerm ? "Intenta con otra búsqueda." : "¡Agrega tu primer producto para empezar a vender!"}
           </p>
         </div>
       ) : (
         Object.keys(groupedProducts)
           .sort()
           .map((category) => (
-            <div
-              key={category}
-              className="bg-white rounded-xl shadow-md overflow-hidden"
-            >
+            <div key={category} className="bg-white rounded-xl shadow-md overflow-hidden">
               <h2 className="px-4 sm:px-6 py-3 sm:py-4 bg-pink-50 text-pink-800 font-bold text-sm sm:text-base sticky top-0 z-10">
                 {category} ({groupedProducts[category].length})
               </h2>
@@ -755,59 +890,37 @@ export const InventoryPage = ({ app, appId }) => {
               {/* Vista móvil - Cards */}
               <div className="sm:hidden divide-y">
                 {groupedProducts[category].map((product) => (
-                  <div
-                    key={product.id}
-                    className="p-4 flex items-center gap-3 active:bg-pink-50/50"
-                  >
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
-                        onError={(e) => (e.target.style.display = "none")}
-                      />
-                    ) : (
-                      <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <ImageIcon className="w-6 h-6 text-gray-400" />
+                  <div key={product.id} className="p-4">
+                    <div className="flex items-start gap-3">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} className="w-16 h-16 rounded-lg object-cover" onError={(e) => { e.target.style.display = "none"; }} />
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-100 flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-gray-300" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-gray-800">{product.name}</p>
+                            <p className="text-sm text-pink-600 font-bold">${product.price?.toLocaleString("es-CL")}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${product.stock <= 5 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                              {product.stock || product.currentStock || 0}
+                            </span>
+                            {inventoryView === "evento" && product.isEventExclusive && (
+                              <span className="block text-[10px] text-orange-500 mt-1">🎉 Exclusivo</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          {inventoryView === "maestro" && (
+                            <button onClick={() => { setProductToEdit(product); setIsModalOpen(true); }} className="text-xs text-blue-600 hover:underline">Editar</button>
+                          )}
+                          <button onClick={() => openMermaModal({ ...product, isEventProduct: inventoryView === "evento" })} className="text-xs text-red-600 hover:underline">Merma</button>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-sm text-gray-600">
-                          ${product.price.toLocaleString("es-CL")}
-                        </span>
-                        <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                            product.stock <= 5
-                              ? "bg-red-100 text-red-600"
-                              : "bg-green-100 text-green-600"
-                          }`}
-                        >
-                          {product.stock} unid.
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openMermaModal(product)}
-                        className="p-3 text-gray-500 active:text-orange-600 active:bg-orange-100 rounded-full touch-target"
-                        title="Registrar merma"
-                      >
-                        <TrendingDownIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => openEditModal(product)}
-                        className="p-3 text-gray-500 active:text-pink-600 active:bg-pink-100 rounded-full touch-target"
-                      >
-                        <EditIcon className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id)}
-                        className="p-3 text-gray-500 active:text-red-600 active:bg-red-100 rounded-full touch-target"
-                      >
-                        <Trash2Icon className="w-5 h-5" />
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -816,64 +929,49 @@ export const InventoryPage = ({ app, appId }) => {
               {/* Vista desktop - Tabla */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-left">
+                    <tr>
+                      <th className="px-4 py-3 font-medium text-gray-500">Producto</th>
+                      <th className="px-4 py-3 font-medium text-gray-500">Precio</th>
+                      <th className="px-4 py-3 font-medium text-gray-500 text-center">Stock</th>
+                      <th className="px-4 py-3 font-medium text-gray-500 text-right">Acciones</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {groupedProducts[category].map((product, index) => (
-                      <tr
-                        key={product.id}
-                        className={`border-t ${
-                          index % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                        }`}
-                      >
-                        <td className="px-4 lg:px-6 py-3 flex items-center gap-4">
-                          {product.imageUrl ? (
-                            <img
-                              src={product.imageUrl}
-                              alt={product.name}
-                              className="h-10 w-10 rounded-md object-cover"
-                              onError={(e) => (e.target.style.display = "none")}
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-md bg-gray-100 flex items-center justify-center">
-                              <ImageIcon className="w-5 h-5 text-gray-400" />
+                      <tr key={product.id} className={`border-t ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.name} className="w-10 h-10 rounded-lg object-cover" onError={(e) => { e.target.style.display = "none"; }} />
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                                <ImageIcon className="w-5 h-5 text-gray-300" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-800">{product.name}</p>
+                              {inventoryView === "evento" && product.isEventExclusive && (
+                                <span className="text-[10px] text-orange-500">🎉 Exclusivo del evento</span>
+                              )}
                             </div>
-                          )}
-                          <span className="font-medium text-gray-900">
-                            {product.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-pink-600 font-bold">${product.price?.toLocaleString("es-CL")}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${product.stock <= 5 ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                            {product.stock || product.currentStock || 0}
                           </span>
                         </td>
-                        <td className="px-4 lg:px-6 py-4 text-gray-600">
-                          ${product.price.toLocaleString("es-CL")}
-                        </td>
-                        <td
-                          className={`px-4 lg:px-6 py-4 font-semibold text-right ${
-                            product.stock <= 5
-                              ? "text-red-500"
-                              : "text-green-600"
-                          }`}
-                        >
-                          {product.stock}{" "}
-                          <span className="text-xs text-gray-400">unid.</span>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4 w-36">
-                          <div className="flex justify-end items-center gap-1">
-                            <button
-                              onClick={() => openMermaModal(product)}
-                              className="p-2 text-gray-500 hover:text-orange-600 hover:bg-orange-100 rounded-full transition-colors"
-                              title="Registrar merma"
-                            >
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            {inventoryView === "maestro" && (
+                              <button onClick={() => { setProductToEdit(product); setIsModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+                                <EditIcon className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button onClick={() => openMermaModal({ ...product, isEventProduct: inventoryView === "evento" })} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" title="Registrar merma">
                               <TrendingDownIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => openEditModal(product)}
-                              className="p-2 text-gray-500 hover:text-pink-600 hover:bg-pink-100 rounded-full transition-colors"
-                            >
-                              <EditIcon className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product.id)}
-                              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full transition-colors"
-                            >
-                              <Trash2Icon className="w-4 h-4" />
                             </button>
                           </div>
                         </td>

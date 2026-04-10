@@ -48,6 +48,9 @@ export const EventCloseModal = ({ isOpen, onClose, event, eventInventory, onClos
   // Obtener productos con stock剩余
   const remainingProducts = eventInventory?.filter((item) => item.stock > 0) || [];
 
+  // Productos exclusivos del evento (no existen en el maestro)
+  const exclusiveProducts = eventInventory?.filter((item) => item.isEventExclusive) || [];
+
   const handleDecisionChange = (productId, decision) => {
     setDecisions((prev) => ({
       ...prev,
@@ -142,47 +145,55 @@ export const EventCloseModal = ({ isOpen, onClose, event, eventInventory, onClos
               ¿Qué hacer con el stock no vendido?
             </p>
             <div className="space-y-2 max-h-[30vh] overflow-y-auto">
-              {remainingProducts.map((item) => (
-                <div
-                  key={item.productId}
-                  className="bg-orange-50 rounded-lg p-3"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">{item.name}</span>
-                    <span className="text-sm font-bold text-orange-600">
-                      {item.stock} unid.
-                    </span>
+              {remainingProducts.map((item) => {
+                const isExclusive = item.isEventExclusive;
+                const isImported = !isExclusive && item.productId; // Producto importado del maestro
+                
+                return (
+                  <div
+                    key={item.productId}
+                    className="bg-orange-50 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{item.name}</span>
+                        {isExclusive && <span className="text-[10px] bg-orange-200 text-orange-700 px-1.5 py-0.5 rounded">🎉 Exclusivo</span>}
+                      </div>
+                      <span className="text-sm font-bold text-orange-600">
+                        {item.stock} unid.
+                      </span>
+                    </div>
+                    
+                    {/* Opciones de decisión */}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleDecisionChange(item.productId, "reintegrate")}
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${
+                          decisions[item.productId] === "reintegrate"
+                            ? "bg-green-600 text-white"
+                            : "bg-white border-2 border-gray-200 text-gray-600 active:bg-gray-50"
+                        }`}
+                      >
+                        <RefreshIcon className="w-4 h-4" />
+                        {isExclusive ? "Crear en Maestro" : "Reintegrar"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDecisionChange(item.productId, "discard")}
+                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${
+                          decisions[item.productId] === "discard"
+                            ? "bg-red-600 text-white"
+                            : "bg-white border-2 border-gray-200 text-gray-600 active:bg-gray-50"
+                        }`}
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        Descartar (Merma)
+                      </button>
+                    </div>
                   </div>
-                  
-                  {/* Opciones de decisión */}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleDecisionChange(item.productId, "reintegrate")}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${
-                        decisions[item.productId] === "reintegrate"
-                          ? "bg-green-600 text-white"
-                          : "bg-white border-2 border-gray-200 text-gray-600 active:bg-gray-50"
-                      }`}
-                    >
-                      <RefreshIcon className="w-4 h-4" />
-                      Reintegrar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDecisionChange(item.productId, "discard")}
-                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1 ${
-                        decisions[item.productId] === "discard"
-                          ? "bg-red-600 text-white"
-                          : "bg-white border-2 border-gray-200 text-gray-600 active:bg-gray-50"
-                      }`}
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      Descartar
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

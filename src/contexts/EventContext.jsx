@@ -187,16 +187,36 @@ export const EventProvider = ({ children, app, appId, userId }) => {
 
       // Procesar cada producto según la decisión
       for (const item of inventoryItems) {
-        const decision = decisions[item.productId];
+        const productKey = item.productId || item.id; // Usar id del doc si no hay productId
+        const decision = decisions[productKey] || decisions[item.productId] || "reintegrate";
         
         if (decision === "reintegrate") {
-          // Reintegrar stock al maestro
-          const masterRef = doc(db, masterProductsPath, item.productId);
-          await updateDoc(masterRef, {
-            stock: item.stock,
-          });
+          if (item.isEventExclusive) {
+            // Producto exclusivo del evento → crear en el maestro
+            await addDoc(collection(db, masterProductsPath), {
+              name: item.name,
+              price: item.price,
+              category: item.category || "Otros",
+              imageUrl: item.imageUrl || "",
+              stock: item.stock, // El stock restante se agrega al maestro
+              active: true,
+              createdAt: Timestamp.now(),
+              createdFromEvent: eventId,
+            });
+          } else if (item.productId) {
+            // Producto importado del maestro → reintegrar stock
+            const masterRef = doc(db, masterProductsPath, item.productId);
+            // Obtener stock actual del maestro y sumar
+            const masterSnap = await getDocs(query(collection(db, masterProductsPath), where("__name__", "==", item.productId), limit(1)));
+            if (!masterSnap.empty) {
+              const currentMasterStock = masterSnap.docs[0].data().stock || 0;
+              await updateDoc(masterRef, {
+                stock: currentMasterStock + item.stock,
+              });
+            }
+          }
         }
-        // Si es "discard", simplemente no se hace nada (el stock se pierde)
+        // Si es "discard", simplemente no se hace nada (el stock se pierde/se registra como merma)
       }
 
       // Actualizar evento a cerrado
