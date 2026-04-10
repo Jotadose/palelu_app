@@ -13,6 +13,8 @@ import {
 import { useToast } from "../contexts/ToastContext";
 import { useEvent } from "../contexts/EventContext";
 import { Modal } from "../components/UI";
+import { EventCreateModal } from "../components/EventCreateModal";
+import { ImportProductsToEventModal } from "../components/ImportProductsToEventModal";
 import {
   SearchIcon,
   PlusCircleIcon,
@@ -522,7 +524,7 @@ const ProductForm = ({ onClose, appId, db, productToEdit }) => {
 
 export const InventoryPage = ({ app, appId }) => {
   const { showToast } = useToast();
-  const { currentEvent, eventInventory, isEventActive } = useEvent();
+  const { currentEvent, eventInventory, isEventActive, getMasterProducts } = useEvent();
   const db = getFirestore(app);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -585,6 +587,19 @@ export const InventoryPage = ({ app, appId }) => {
     setIsModalOpen(true);
   };
 
+  const openAddToEventModal = () => {
+    // En vista evento: abrir modal para agregar productos del maestro al evento
+    if (inventoryView === "evento" && currentEvent) {
+      // Emitir un evento o usar un estado para abrir el modal de importar del maestro
+      setShowImportModal(true);
+    } else {
+      setProductToEdit(null);
+      setIsModalOpen(true);
+    }
+  };
+
+  const [showImportModal, setShowImportModal] = useState(false);
+
   const openEditModal = (product) => {
     setProductToEdit(product);
     setIsModalOpen(true);
@@ -629,6 +644,13 @@ export const InventoryPage = ({ app, appId }) => {
         appId={appId}
         db={db}
         onSuccess={() => setProductForMerma(null)}
+      />
+
+      <ImportProductsToEventModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        eventId={currentEvent?.id}
+        appId={appId}
       />
 
       {/* Header - Optimizado para móvil */}
@@ -687,7 +709,7 @@ export const InventoryPage = ({ app, appId }) => {
           <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         </div>
         <button
-          onClick={openAddModal}
+          onClick={inventoryView === "evento" ? openAddToEventModal : openAddModal}
           className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-base font-medium text-white bg-pink-600 rounded-xl shadow-lg active:bg-pink-700 active:scale-[0.98] transition-all touch-target"
         >
           <PlusCircleIcon className="w-5 h-5" />
